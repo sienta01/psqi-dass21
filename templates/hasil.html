@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Hasil — {{ app_title }}{% endblock %}
+{% block content %}
+
+<div class="result-head">
+  <h1>Hasil Penilaian</h1>
+  <div class="result-meta">
+    <span><b>Nama:</b> {{ data.get('nama', '-') }}</span>
+    <span><b>No. RM:</b> {{ data.get('no_rm') or '-' }}</span>
+    <span><b>Tanggal:</b> {{ data.get('tanggal') or '-' }}</span>
+    {% if not public %}<span><b>ID #{{ resp_id }}</b> • {{ created_at }}</span>{% endif %}
+  </div>
+</div>
+
+{# ---------------- PSQI ---------------- #}
+<section class="result-card">
+  <h2>PSQI — Kualitas Tidur</h2>
+  <div class="score-banner {{ 'bad' if skor.psqi.buruk else 'good' }}">
+    <div class="score-big">{{ skor.psqi.skor_global }}<span>/21</span></div>
+    <div class="score-text">
+      <strong>{{ skor.psqi.interpretasi }}</strong>
+      <span class="muted">Skor global &gt; 5 menunjukkan kualitas tidur buruk.</span>
+    </div>
+  </div>
+
+  <table class="table">
+    <thead><tr><th>Komponen</th><th class="num">Skor (0–3)</th></tr></thead>
+    <tbody>
+      {% for key, label in psqi_label.items() %}
+        <tr>
+          <td>{{ label }}</td>
+          <td class="num">{{ skor.psqi.komponen[key] }}</td>
+        </tr>
+      {% endfor %}
+      <tr class="row-total">
+        <td>Skor Global PSQI</td>
+        <td class="num">{{ skor.psqi.skor_global }}</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="muted small">
+    {% if skor.psqi.efisiensi_persen is not none %}
+      Efisiensi tidur: {{ skor.psqi.efisiensi_persen }}% •
+    {% endif %}
+    {% if skor.psqi.jam_di_tempat_tidur is not none %}
+      Lama di tempat tidur: {{ skor.psqi.jam_di_tempat_tidur }} jam
+    {% endif %}
+  </p>
+</section>
+
+{# ---------------- DASS-21 ---------------- #}
+<section class="result-card">
+  <h2>DASS-21 — Depresi, Cemas, Stres</h2>
+  <div class="dass-cards">
+    {% for sub, label in dass_label.items() %}
+      {% set d = skor.dass21[sub] %}
+      <div class="dass-card kat-{{ d.kategori|lower|replace(' ', '-') }}">
+        <div class="dass-card-label">{{ label }}</div>
+        <div class="dass-card-score">{{ d.skor }}</div>
+        <div class="dass-card-kat">{{ d.kategori }}</div>
+        <div class="dass-card-raw muted small">skor mentah {{ d.mentah }} × 2</div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <details class="interp">
+    <summary>Tabel interpretasi DASS-21</summary>
+    <table class="table">
+      <thead>
+        <tr>{% for h in dass_tabel.header %}<th>{{ h }}</th>{% endfor %}</tr>
+      </thead>
+      <tbody>
+        {% for row in dass_tabel.rows %}
+          <tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </details>
+</section>
+
+<div class="result-actions">
+  {% if public %}
+    <a class="btn btn-primary" href="{{ url_for('isi') }}">Isi Responden Baru</a>
+    <a class="btn btn-ghost" href="{{ url_for('index') }}">Beranda</a>
+  {% else %}
+    <a class="btn btn-ghost" href="{{ url_for('admin') }}">← Kembali ke Data</a>
+    <button class="btn btn-ghost" onclick="window.print()">Cetak / PDF</button>
+    <form method="POST" action="{{ url_for('admin_hapus', resp_id=resp_id) }}"
+          onsubmit="return confirm('Hapus data responden #{{ resp_id }}? Tindakan ini tidak dapat dibatalkan.');"
+          style="display:inline">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <button class="btn btn-danger" type="submit">Hapus Data</button>
+    </form>
+  {% endif %}
+</div>
+
+{% endblock %}

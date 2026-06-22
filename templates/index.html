@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <h1>Selamat Datang</h1>
+  <p class="lead">
+    Aplikasi ini digunakan untuk pengumpulan data karakteristik pasien serta
+    penilaian kualitas tidur (<strong>PSQI</strong>) dan tingkat
+    depresi, kecemasan, dan stres (<strong>DASS-21</strong>).
+  </p>
+
+  <div class="card-grid">
+    <div class="info-card">
+      <h3>1. Karakteristik Pasien</h3>
+      <p>Data identitas dan klinis ringkas pasien stroke.</p>
+    </div>
+    <div class="info-card">
+      <h3>2. PSQI</h3>
+      <p>Pittsburgh Sleep Quality Index — menilai kualitas tidur sebulan
+         terakhir. Skor dihitung otomatis.</p>
+    </div>
+    <div class="info-card">
+      <h3>3. DASS-21</h3>
+      <p>Mengukur tingkat depresi, kecemasan, dan stres selama satu minggu
+         terakhir. Interpretasi otomatis.</p>
+    </div>
+  </div>
+
+  <p class="cta">
+    <a class="btn btn-primary btn-lg" href="{{ url_for('isi') }}">
+      Mulai Mengisi Kuesioner →
+    </a>
+  </p>
+
+  <p class="muted">Estimasi waktu pengisian: 10–15 menit.
+    {% if session.get('is_admin') %}<br>Total data terkumpul: <strong>{{ total }}</strong>.{% endif %}
+  </p>
+</section>
+{% endblock %}

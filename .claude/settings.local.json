@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/user/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/c9813406-f57b-4b7e-b2a9-2c5748fde3fc/6194d1e7-9abd-49b5-9fad-bc547d257ec8/skills/docx/**)",
+      "Bash(extract-text \"C:\\\\Users\\\\user\\\\OneDrive\\\\Documents\\\\Tesis Timmy\\\\Form Pengambilan Data.docx\")",
+      "Bash(pandoc \"C:\\\\Users\\\\user\\\\OneDrive\\\\Documents\\\\Tesis Timmy\\\\Form Pengambilan Data.docx\" -o /tmp/form.md)",
+      "Bash(echo \"---EXIT: $?---\")",
+      "Bash(python scripts/office/unpack.py \"C:\\\\Users\\\\user\\\\OneDrive\\\\Documents\\\\Tesis Timmy\\\\Form Pengambilan Data.docx\" /tmp/form_unpacked/)",
+      "Bash(python test_scoring.py)",
+      "Bash(python -c \"import app\")",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(python test_app.py)"
+    ]
+  }
+}

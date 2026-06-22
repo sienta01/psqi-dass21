@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+{% block title %}Isi Kuesioner — {{ app_title }}{% endblock %}
+
+{# ---------- Macro ---------- #}
+{% macro radio_scale(name, options, required=True) %}
+  <div class="scale {% if name in errors %}has-error{% endif %}" data-group="{{ name }}">
+    {% for val, label in options %}
+      <label class="scale-opt">
+        <input type="radio" name="{{ name }}" value="{{ val }}"
+               {% if required %}data-required="1"{% endif %}
+               {% if values.get(name) == val|string %}checked{% endif %}>
+        <span class="scale-box"><span class="scale-val">{{ val }}</span></span>
+        <span class="scale-label">{{ label }}</span>
+      </label>
+    {% endfor %}
+  </div>
+{% endmacro %}
+
+{% macro radio_list(name, options, required=True) %}
+  <div class="optlist {% if name in errors %}has-error{% endif %}" data-group="{{ name }}">
+    {% for opt in options %}
+      <label class="opt">
+        <input type="radio" name="{{ name }}" value="{{ opt }}"
+               {% if required %}data-required="1"{% endif %}
+               {% if values.get(name) == opt %}checked{% endif %}>
+        <span>{{ opt }}</span>
+      </label>
+    {% endfor %}
+  </div>
+{% endmacro %}
+
+{% block content %}
+<form method="POST" action="{{ url_for('isi') }}" id="kuesioner" novalidate>
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+
+  {# Progress #}
+  <div class="steps-bar">
+    <div class="step-pill active" data-pill="0"><span>1</span> Data Pasien</div>
+    <div class="step-pill" data-pill="1"><span>2</span> PSQI</div>
+    <div class="step-pill" data-pill="2"><span>3</span> DASS-21</div>
+  </div>
+
+  {% if errors %}
+    <div class="flash flash-error">Ada {{ errors|length }} isian wajib yang
+      belum lengkap. Mohon periksa bagian yang ditandai merah.</div>
+  {% endif %}
+
+  {# ============ STEP 1: DATA PASIEN ============ #}
+  <fieldset class="form-step" data-step="0">
+    <h2 class="step-title">Bagian 1 — Karakteristik Pasien</h2>
+    {% for f in Q.PASIEN_FIELDS %}
+      <div class="field {% if f.name in errors %}has-error{% endif %}">
+        <label class="field-label" for="{{ f.name }}">
+          {{ loop.index }}. {{ f.label }}
+          {% if f.required %}<span class="req">*</span>{% endif %}
+        </label>
+
+        {% if f.type in ['text', 'date', 'number', 'tel'] %}
+          <input class="input" type="{{ f.type }}" id="{{ f.name }}"
+                 name="{{ f.name }}" value="{{ values.get(f.name, '') }}"
+                 {% if f.required %}data-required="1"{% endif %}
+                 {% if f.min is defined %}min="{{ f.min }}"{% endif %}
+                 {% if f.max is defined %}max="{{ f.max }}"{% endif %}>
+
+        {% elif f.type == 'radio' %}
+          {{ radio_list(f.name, f.options, f.required) }}
+
+        {% elif f.type == 'radio_other' %}
+          {{ radio_list(f.name, f.options, f.required) }}
+          <div class="other-box" data-show-when="{{ f.name }}={{ f.other_value }}">
+            <label class="field-sublabel" for="{{ f.other_name }}">{{ f.other_label }}:</label>
+            <input class="input" type="text" id="{{ f.other_name }}"
+                   name="{{ f.other_name }}" value="{{ values.get(f.other_name, '') }}">
+          </div>
+        {% endif %}
+      </div>
+    {% endfor %}
+
+    <div class="step-nav">
+      <span></span>
+      <button type="button" class="btn btn-primary" data-next>Lanjut ke PSQI →</button>
+    </div>
+  </fieldset>
+
+  {# ============ STEP 2: PSQI ============ #}
+  <fieldset class="form-step is-hidden" data-step="1">
+    <h2 class="step-title">Bagian 2 — Kualitas Tidur (PSQI)</h2>
+    <p class="petunjuk">{{ Q.PSQI_PETUNJUK }}</p>
+
+    {# Pertanyaan 1-4 isian #}
+    {% for item in Q.PSQI_ISIAN %}
+      <div class="field {% if item.name in errors %}has-error{% endif %}">
+        <label class="field-label" for="{{ item.name }}">
+          {{ item.no }}. {{ item.label }} <span class="req">*</span>
+        </label>
+        <div class="inline-input">
+          <input class="input input-sm" type="{{ item.type }}" id="{{ item.name }}"
+                 name="{{ item.name }}" value="{{ values.get(item.name, '') }}"
+                 data-required="1"
+                 {% if item.min is defined %}min="{{ item.min }}"{% endif %}
+                 {% if item.max is defined %}max="{{ item.max }}"{% endif %}
+                 {% if item.step is defined %}step="{{ item.step }}"{% endif %}>
+          {% if item.suffix %}<span class="suffix">{{ item.suffix }}</span>{% endif %}
+        </div>
+      </div>
+    {% endfor %}
+
+    {# Pertanyaan 5 a-j #}
+    <div class="field">
+      <p class="field-label">5. Selama sebulan terakhir, seberapa sering Anda
+        mengalami kesulitan tidur karena hal berikut? <span class="req">*</span></p>
+      <div class="matrix">
+        {% for name, huruf, teks in Q.PSQI_Q5_ITEMS %}
+          <div class="matrix-row {% if name in errors %}has-error{% endif %}">
+            <div class="matrix-q">{{ huruf }}. {{ teks }}</div>
+            {{ radio_scale(name, Q.PSQI_SKALA_FREKUENSI, required=(huruf != 'j')) }}
+            {% if huruf == 'j' %}
+              <input class="input input-other" type="text" name="{{ Q.PSQI_Q5J_OTHER }}"
+                     placeholder="Sebutkan alasan lain (opsional)"
+                     value="{{ values.get(Q.PSQI_Q5J_OTHER, '') }}">
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    {# Pertanyaan 6 & 7 #}
+    {% for item in [Q.PSQI_Q6, Q.PSQI_Q7] %}
+      <div class="field {% if item.name in errors %}has-error{% endif %}">
+        <p class="field-label">{{ item.no }}. {{ item.label }} <span class="req">*</span></p>
+        {{ radio_scale(item.name, Q.PSQI_SKALA_FREKUENSI) }}
+      </div>
+    {% endfor %}
+
+    {# Pertanyaan 8 & 9 #}
+    {% for item in [Q.PSQI_Q8, Q.PSQI_Q9] %}
+      <div class="field {% if item.name in errors %}has-error{% endif %}">
+        <p class="field-label">{{ item.no }}. {{ item.label }} <span class="req">*</span></p>
+        {{ radio_scale(item.name, item.skala) }}
+      </div>
+    {% endfor %}
+
+    {# Pertanyaan 10 (tidak masuk skor) #}
+    <div class="field">
+      <p class="field-label">{{ Q.PSQI_Q10.no }}. {{ Q.PSQI_Q10.label }}
+        <span class="hint">({{ Q.PSQI_Q10.catatan }})</span></p>
+      {{ radio_scale(Q.PSQI_Q10.name, Q.PSQI_Q10.skala, required=False) }}
+    </div>
+
+    {# Pertanyaan 11 (laporan pasangan, tidak masuk skor) #}
+    <div class="field">
+      <p class="field-label">11. {{ Q.PSQI_Q11_PENGANTAR }}</p>
+      <div class="matrix">
+        {% for name, huruf, teks in Q.PSQI_Q11_ITEMS %}
+          <div class="matrix-row">
+            <div class="matrix-q">{{ huruf }}. {{ teks }}</div>
+            {{ radio_scale(name, Q.PSQI_SKALA_FREKUENSI, required=False) }}
+            {% if huruf == 'e' %}
+              <input class="input input-other" type="text" name="{{ Q.PSQI_Q11E_OTHER }}"
+                     placeholder="Gambarkan (opsional)"
+                     value="{{ values.get(Q.PSQI_Q11E_OTHER, '') }}">
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="step-nav">
+      <button type="button" class="btn btn-ghost" data-prev>← Kembali</button>
+      <button type="button" class="btn btn-primary" data-next>Lanjut ke DASS-21 →</button>
+    </div>
+  </fieldset>
+
+  {# ============ STEP 3: DASS-21 ============ #}
+  <fieldset class="form-step is-hidden" data-step="2">
+    <h2 class="step-title">Bagian 3 — DASS-21</h2>
+    <p class="petunjuk">{{ Q.DASS_PETUNJUK }}</p>
+    <div class="legend">
+      {% for val, singkat, panjang in Q.DASS_SKALA %}
+        <span class="legend-item"><b>{{ val }}</b> = {{ panjang }}</span>
+      {% endfor %}
+    </div>
+
+    <div class="matrix dass-matrix">
+      <div class="matrix-head">
+        <div class="matrix-q">Pernyataan</div>
+        {% for val, singkat, panjang in Q.DASS_SKALA %}
+          <div class="matrix-h" title="{{ panjang }}">{{ val }}</div>
+        {% endfor %}
+      </div>
+      {% for nomor, kode, teks in Q.DASS_ITEMS %}
+        {% set name = 'dass_q' ~ nomor %}
+        <div class="matrix-row dass-row {% if name in errors %}has-error{% endif %}" data-group="{{ name }}">
+          <div class="matrix-q"><span class="qnum">{{ nomor }}.</span> {{ teks }}</div>
+          {% for val, singkat, panjang in Q.DASS_SKALA %}
+            <label class="dass-opt">
+              <input type="radio" name="{{ name }}" value="{{ val }}" data-required="1"
+                     {% if values.get(name) == val|string %}checked{% endif %}>
+              <span class="dass-dot">{{ val }}</span>
+            </label>
+          {% endfor %}
+        </div>
+      {% endfor %}
+    </div>
+
+    <div class="step-nav">
+      <button type="button" class="btn btn-ghost" data-prev>← Kembali</button>
+      <button type="submit" class="btn btn-success btn-lg">Kirim & Lihat Hasil ✓</button>
+    </div>
+  </fieldset>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='form.js') }}"></script>
+{% endblock %}

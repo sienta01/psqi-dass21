@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Data Responden — {{ app_title }}{% endblock %}
+{% block content %}
+<div class="admin-head">
+  <h1>Data Responden</h1>
+  <div class="admin-actions">
+    <span class="badge">Total: {{ total }}</span>
+    <a class="btn btn-success" href="{{ url_for('admin_export') }}">⬇ Ekspor CSV</a>
+  </div>
+</div>
+
+{% if rows %}
+<div class="table-wrap">
+  <table class="table table-admin">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Tanggal</th>
+        <th>Nama</th>
+        <th>No. RM</th>
+        <th>Usia</th>
+        <th>JK</th>
+        <th class="num">PSQI</th>
+        <th>Tidur</th>
+        <th class="num">Depresi</th>
+        <th class="num">Cemas</th>
+        <th class="num">Stres</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td>{{ r['id'] }}</td>
+        <td>{{ r['tanggal'] or '-' }}</td>
+        <td>{{ r['nama'] or '-' }}</td>
+        <td>{{ r['no_rm'] or '-' }}</td>
+        <td>{{ r['usia'] or '-' }}</td>
+        <td>{{ (r['jenis_kelamin'] or '')[:1] }}</td>
+        <td class="num">{{ r['psqi_global'] }}</td>
+        <td>
+          {% if r['psqi_buruk'] %}
+            <span class="tag tag-bad">Buruk</span>
+          {% else %}
+            <span class="tag tag-good">Baik</span>
+          {% endif %}
+        </td>
+        <td class="num">{{ r['dass_depresi'] }} <small>{{ r['dass_depresi_kat'] }}</small></td>
+        <td class="num">{{ r['dass_cemas'] }} <small>{{ r['dass_cemas_kat'] }}</small></td>
+        <td class="num">{{ r['dass_stres'] }} <small>{{ r['dass_stres_kat'] }}</small></td>
+        <td><a class="link" href="{{ url_for('admin_detail', resp_id=r['id']) }}">Detail</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+  <p class="muted">Belum ada data. <a href="{{ url_for('isi') }}">Isi kuesioner pertama →</a></p>
+{% endif %}
+{% endblock %}
