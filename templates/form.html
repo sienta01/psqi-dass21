@@ -30,7 +30,14 @@
 {% endmacro %}
 
 {% block content %}
-<form method="POST" action="{{ url_for('isi') }}" id="kuesioner" novalidate>
+{% if edit_id %}
+  <div class="edit-banner">
+    <span>✎ Mode edit — memperbarui data responden
+      <strong>{{ edit_nama or '—' }}</strong> (#{{ edit_id }}).</span>
+    <a class="link" href="{{ url_for('admin_detail', resp_id=edit_id) }}">Batal</a>
+  </div>
+{% endif %}
+<form method="POST" action="{{ form_action or url_for('isi') }}" id="kuesioner" novalidate>
   <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
 
   {# Progress #}
@@ -205,7 +212,9 @@
 
     <div class="step-nav">
       <button type="button" class="btn btn-ghost" data-prev>← Kembali</button>
-      <button type="submit" class="btn btn-success btn-lg">Kirim & Lihat Hasil ✓</button>
+      <button type="submit" class="btn btn-success btn-lg">
+        {% if edit_id %}Simpan Perubahan ✓{% else %}Kirim &amp; Lihat Hasil ✓{% endif %}
+      </button>
     </div>
   </fieldset>
 </form>

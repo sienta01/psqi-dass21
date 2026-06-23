@@ -145,7 +145,9 @@ Karena aplikasi menyimpan data pasien (termasuk identitas), lakukan hal berikut:
   atau langsung ke `/isi`. Isi 3 bagian, lalu **Kirim** untuk melihat hasil.
 - **Untuk peneliti (admin)**: klik **Admin** → masuk dengan password →
   lihat tabel **Data Responden** → **Ekspor CSV** untuk analisis.
-  Klik **Detail** pada satu baris untuk melihat/ mencetak rincian, atau menghapus data.
+  Pada tiap baris tersedia **Detail** (melihat/mencetak rincian) dan **Edit**
+  (mengubah jawaban responden — skor PSQI & DASS-21 dihitung ulang otomatis,
+  dan data tidak diduplikasi). Menghapus data dilakukan dari halaman Detail.
 
 ---
 

@@ -107,6 +107,14 @@ def index():
     return render_template("index.html", total=db.hitung_total())
 
 
+def _collect_and_validate():
+    """Ambil seluruh field dari form POST + daftar field wajib yang kosong."""
+    values = {name: request.form.get(name, "").strip()
+              for name in EXPECTED_FIELDS}
+    errors = [name for name in REQUIRED_FIELDS if not values.get(name)]
+    return values, errors
+
+
 @app.route("/isi", methods=["GET", "POST"])
 def isi():
     values = {}
@@ -116,14 +124,7 @@ def isi():
         if not _check_csrf():
             abort(400, "Token formulir tidak valid. Muat ulang halaman.")
 
-        values = {name: request.form.get(name, "").strip()
-                  for name in EXPECTED_FIELDS}
-
-        # Validasi field wajib
-        for name in REQUIRED_FIELDS:
-            if not values.get(name):
-                errors.append(name)
-
+        values, errors = _collect_and_validate()
         if not errors:
             skor = hitung_semua(values)
             resp_id = db.simpan_response(values, skor)
@@ -136,6 +137,7 @@ def isi():
 
     return render_template(
         "form.html", Q=Q, values=values, errors=set(errors),
+        form_action=url_for("isi"),
     )
 
 
@@ -199,6 +201,36 @@ def admin_detail(resp_id):
         psqi_label=PSQI_KOMPONEN_LABEL, dass_label=DASS_SUBSKALA_LABEL,
         dass_tabel=Q.DASS_TABEL_INTERPRETASI, public=False,
         created_at=row["created_at"],
+    )
+
+
+@app.route("/admin/edit/<int:resp_id>", methods=["GET", "POST"])
+@login_required
+def admin_edit(resp_id):
+    row = db.ambil_satu(resp_id)
+    if row is None:
+        abort(404)
+    import json
+    errors = []
+
+    if request.method == "POST":
+        if not _check_csrf():
+            abort(400)
+        values, errors = _collect_and_validate()
+        if not errors:
+            skor = hitung_semua(values)
+            db.update_response(resp_id, values, skor)
+            flash("Data responden #%d berhasil diperbarui." % resp_id, "ok")
+            return redirect(url_for("admin_detail", resp_id=resp_id))
+        flash("Masih ada pertanyaan wajib yang belum diisi. "
+              "Bagian yang belum lengkap ditandai.", "error")
+    else:
+        values = json.loads(row["data_json"])
+
+    return render_template(
+        "form.html", Q=Q, values=values, errors=set(errors),
+        form_action=url_for("admin_edit", resp_id=resp_id),
+        edit_id=resp_id, edit_nama=row["nama"],
     )
 
 

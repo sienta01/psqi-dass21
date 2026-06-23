@@ -48,7 +48,10 @@
         <td class="num">{{ r['dass_depresi'] }} <small>{{ r['dass_depresi_kat'] }}</small></td>
         <td class="num">{{ r['dass_cemas'] }} <small>{{ r['dass_cemas_kat'] }}</small></td>
         <td class="num">{{ r['dass_stres'] }} <small>{{ r['dass_stres_kat'] }}</small></td>
-        <td><a class="link" href="{{ url_for('admin_detail', resp_id=r['id']) }}">Detail</a></td>
+        <td class="actions-cell">
+          <a class="link" href="{{ url_for('admin_detail', resp_id=r['id']) }}">Detail</a>
+          <a class="link" href="{{ url_for('admin_edit', resp_id=r['id']) }}">Edit</a>
+        </td>
       </tr>
       {% endfor %}
     </tbody>

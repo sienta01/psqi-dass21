@@ -102,6 +102,36 @@ def main():
     n_kolom = csv_text.splitlines()[0].count(",") + 1
     print("OK  ekspor CSV (%d kolom)" % n_kolom)
 
+    # 9) Edit data responden #1: ganti nama & ubah semua DASS jadi 0
+    r = client.get("/admin/edit/1")
+    assert r.status_code == 200
+    assert b"Mode edit" in r.data and b"Budi Santoso" in r.data
+    print("OK  GET /admin/edit/1 (form ter-prefill)")
+
+    with client.session_transaction() as s:
+        token = s["_csrf"]
+    payload = isi_lengkap()
+    payload["nama"] = "Budi Diedit"
+    payload["psqi_q4_sleep_hours"] = "8"      # ubah agar skor PSQI berubah
+    for i in range(1, 22):
+        payload["dass_q" + str(i)] = "0"       # semua Normal
+    payload["_csrf"] = token
+    r = client.post("/admin/edit/1", data=payload)
+    assert r.status_code == 302 and "/admin/detail/1" in r.headers["Location"], r.headers.get("Location")
+
+    r = client.get("/admin/detail/1")
+    body = r.data.decode()
+    assert "Budi Diedit" in body, "nama tidak terupdate"
+    assert "Normal" in body, "kategori DASS tidak dihitung ulang"
+    print("OK  POST /admin/edit/1 (data & skor ter-update)")
+
+    # Pastikan tidak menambah baris baru (tetap 1 responden)
+    r = client.get("/admin/export.csv")
+    csv_text = r.data.decode("utf-8")
+    assert "Budi Diedit" in csv_text and "Budi Santoso" not in csv_text
+    assert len([ln for ln in csv_text.splitlines() if ln.strip()]) == 2  # header + 1 data
+    print("OK  edit tidak menambah baris baru")
+
     print("\nSemua smoke test lulus.")
 
 

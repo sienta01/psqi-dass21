@@ -84,6 +84,7 @@
     <a class="btn btn-ghost" href="{{ url_for('index') }}">Beranda</a>
   {% else %}
     <a class="btn btn-ghost" href="{{ url_for('admin') }}">← Kembali ke Data</a>
+    <a class="btn btn-primary" href="{{ url_for('admin_edit', resp_id=resp_id) }}">✎ Edit Data</a>
     <button class="btn btn-ghost" onclick="window.print()">Cetak / PDF</button>
     <form method="POST" action="{{ url_for('admin_hapus', resp_id=resp_id) }}"
           onsubmit="return confirm('Hapus data responden #{{ resp_id }}? Tindakan ini tidak dapat dibatalkan.');"
