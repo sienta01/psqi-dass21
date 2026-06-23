@@ -82,7 +82,7 @@ Ada dua cara — pilih salah satu:
 1. Buka tab **Consoles** → **Bash**.
 2. Jalankan:
    ```bash
-   git clone https://github.com/USERNAME/NAMA-REPO.git psqi-dass21
+   git clone https://github.com/sienta01/psqi-dass21
    ```
 
 ### 3. Install Flask
