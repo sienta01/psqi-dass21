@@ -34,6 +34,12 @@ def isi_lengkap():
         data["psqi_q5" + h] = "1"
     for i in range(1, 22):
         data["dass_q" + str(i)] = "2"
+    # MoCA-Ina: total 5+3+6+3+2+5+6 = 30
+    data.update({
+        "moca_visuospatial": "5", "moca_naming": "3", "moca_attention": "6",
+        "moca_language": "3", "moca_abstraction": "2", "moca_recall": "5",
+        "moca_orientation": "6",
+    })
     return data
 
 
@@ -72,10 +78,12 @@ def main():
     r = client.get(loc)
     assert r.status_code == 200
     body = r.data.decode()
-    assert "PSQI" in body and "DASS-21" in body
+    assert "PSQI" in body and "DASS-21" in body and "MoCA-Ina" in body
     # DASS semua item = 2 -> mentah 14 -> skor 28 untuk tiap subskala
     assert "28" in body
-    print("OK  GET /hasil menampilkan skor")
+    # MoCA total 30 -> Fungsi kognitif normal
+    assert "Fungsi kognitif normal" in body
+    print("OK  GET /hasil menampilkan skor (PSQI, DASS, MoCA)")
 
     # 6) Admin diproteksi
     r = client.get("/admin")
@@ -99,6 +107,7 @@ def main():
     assert "Budi Santoso" in csv_text
     assert "PSQI Skor Global" in csv_text
     assert "DASS Depresi (skor x2)" in csv_text
+    assert "MoCA Total" in csv_text and "MoCA Visuospasial / Eksekutif (maks 5)" in csv_text
     n_kolom = csv_text.splitlines()[0].count(",") + 1
     print("OK  ekspor CSV (%d kolom)" % n_kolom)
 
@@ -131,6 +140,111 @@ def main():
     assert "Budi Diedit" in csv_text and "Budi Santoso" not in csv_text
     assert len([ln for ln in csv_text.splitlines() if ln.strip()]) == 2  # header + 1 data
     print("OK  edit tidak menambah baris baru")
+
+    # 11) Hanya Tanggal + Nama yang wajib: isian minimal harus diterima
+    with client.session_transaction() as s:
+        token = s["_csrf"]
+    r = client.post("/isi", data={
+        "_csrf": token, "tanggal": "2026-06-23", "nama": "Minimal Saja"})
+    assert r.status_code == 302 and "/hasil/" in r.headers["Location"], r.status_code
+    # Field opsional yang kosong dianggap 0 -> PSQI baik, DASS Normal
+    r = client.get(r.headers["Location"])
+    assert b"Kualitas tidur baik" in r.data and b"Normal" in r.data
+    print("OK  POST /isi minimal (hanya tanggal+nama) diterima")
+
+    # 12) Alur longitudinal: pengukuran awal -> akhir -> perbandingan
+    with client.session_transaction() as s:
+        token = s["_csrf"]
+    awal = isi_lengkap()
+    awal["nama"] = "Pasien Longitudinal"
+    awal["psqi_q4_sleep_hours"] = "3"  # tidur buruk di awal
+    awal["_csrf"] = token
+    r = client.post("/isi", data=awal)
+    pid = int(r.headers["Location"].rstrip("/").split("/")[-1])
+
+    # Halaman tambah pengukuran akhir: demografi ter-prefill
+    r = client.get("/admin/pasien/%d/akhir" % pid)
+    assert r.status_code == 200
+    assert b"Pengukuran Akhir" in r.data and b"Pasien Longitudinal" in r.data
+    print("OK  GET /admin/pasien/<id>/akhir (demografi tersalin)")
+
+    # Simpan pengukuran akhir (membaik)
+    akhir = isi_lengkap()
+    akhir["nama"] = "Pasien Longitudinal"
+    akhir["psqi_q4_sleep_hours"] = "8"
+    for i in range(1, 22):
+        akhir["dass_q" + str(i)] = "0"
+    akhir["_csrf"] = token
+    r = client.post("/admin/pasien/%d/akhir" % pid, data=akhir)
+    assert r.status_code == 302 and ("/admin/banding/%d" % pid) in r.headers["Location"]
+    print("OK  POST pengukuran akhir -> redirect perbandingan")
+
+    # Halaman perbandingan menampilkan selisih
+    r = client.get("/admin/banding/%d" % pid)
+    body = r.data.decode()
+    assert "Perbandingan Awal vs Akhir" in body
+    assert "membaik" in body  # minimal satu perubahan membaik
+    print("OK  GET /admin/banding menampilkan selisih")
+
+    # Tidak boleh menambah akhir kedua
+    r = client.get("/admin/pasien/%d/akhir" % pid)
+    assert r.status_code == 302 and ("/admin/banding/%d" % pid) in r.headers["Location"]
+    print("OK  pengukuran akhir kedua ditolak")
+
+    # Daftar admin: pasien ini berstatus 'Selesai'
+    r = client.get("/admin")
+    assert b"Selesai" in r.data
+    print("OK  daftar admin menandai pasien selesai")
+
+    # Ekspor: ada kolom Fase, dan dua baris (awal+akhir) berbagi ID Pasien
+    r = client.get("/admin/export.csv")
+    csv_text = r.data.decode("utf-8")
+    assert "Fase" in csv_text and "ID Pasien (Awal)" in csv_text
+    longis = [ln for ln in csv_text.splitlines() if "Pasien Longitudinal" in ln]
+    assert len(longis) == 2, "harus 2 baris (awal & akhir)"
+    print("OK  ekspor punya kolom Fase & pasangan awal+akhir")
+
+    # Hapus pasien menghapus pengukuran akhir juga (cascade)
+    r = client.post("/admin/hapus/%d" % pid, data={"_csrf": token})
+    assert r.status_code == 302
+    assert client.get("/admin/banding/%d" % pid).status_code == 404  # pasien hilang
+    csv_text = client.get("/admin/export.csv").data.decode("utf-8")
+    assert "Pasien Longitudinal" not in csv_text  # awal & akhir ikut terhapus
+    print("OK  hapus pasien cascade ke pengukuran akhir")
+
+    # 13) Alur autolengkap nama -> pengukuran akhir (admin)
+    # Budi (#1) adalah pengukuran awal tanpa akhir.
+    r = client.get("/admin/cari-pasien?q=Budi")
+    hits = r.get_json()
+    assert r.status_code == 200 and any(h["id"] == 1 for h in hits), hits
+    print("OK  GET /admin/cari-pasien menemukan pasien")
+
+    r = client.get("/admin/pasien/1/data")
+    js = r.get_json()
+    assert "Budi" in (js["nama"] or "") and js["demografi"]["jenis_stroke"]
+    print("OK  GET /admin/pasien/1/data mengembalikan demografi")
+
+    with client.session_transaction() as s:
+        token = s["_csrf"]
+    akhir = isi_lengkap()
+    akhir["nama"] = "Budi Diedit"
+    akhir["parent_id"] = "1"           # tautkan sebagai pengukuran akhir Budi
+    akhir["_csrf"] = token
+    r = client.post("/isi", data=akhir)
+    assert r.status_code == 302 and "/admin/banding/1" in r.headers["Location"], r.headers.get("Location")
+    assert client.get("/admin/banding/1").status_code == 200
+    print("OK  POST /isi dengan parent_id -> tersimpan sebagai akhir")
+
+    # Non-admin tidak boleh menautkan akhir (parent_id diabaikan)
+    client.get("/admin/logout")
+    client.get("/isi")
+    with client.session_transaction() as s:
+        token = s["_csrf"]
+    r = client.post("/isi", data={
+        "_csrf": token, "tanggal": "2026-06-23", "nama": "Penyusup",
+        "parent_id": "2"})
+    assert r.status_code == 302 and "/hasil/" in r.headers["Location"], r.headers.get("Location")
+    print("OK  non-admin: parent_id diabaikan (tetap pengukuran awal)")
 
     print("\nSemua smoke test lulus.")
 

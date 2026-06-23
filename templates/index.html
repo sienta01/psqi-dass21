@@ -4,8 +4,9 @@
   <h1>Selamat Datang</h1>
   <p class="lead">
     Aplikasi ini digunakan untuk pengumpulan data karakteristik pasien serta
-    penilaian kualitas tidur (<strong>PSQI</strong>) dan tingkat
-    depresi, kecemasan, dan stres (<strong>DASS-21</strong>).
+    penilaian kualitas tidur (<strong>PSQI</strong>), tingkat depresi,
+    kecemasan, dan stres (<strong>DASS-21</strong>), serta fungsi kognitif
+    (<strong>MoCA-Ina</strong>). Seluruh skor dihitung secara otomatis.
   </p>
 
   <div class="card-grid">
@@ -23,7 +24,17 @@
       <p>Mengukur tingkat depresi, kecemasan, dan stres selama satu minggu
          terakhir. Interpretasi otomatis.</p>
     </div>
+    <div class="info-card">
+      <h3>4. MoCA-Ina</h3>
+      <p>Montreal Cognitive Assessment versi Indonesia — menilai fungsi
+         kognitif per domain. Total &amp; interpretasi otomatis.</p>
+    </div>
   </div>
+
+  <p class="muted small">
+    Penelitian ini bersifat longitudinal: tiap pasien diukur dua kali —
+    <strong>Awal</strong> (baseline) dan <strong>Akhir</strong>.
+  </p>
 
   <p class="cta">
     <a class="btn btn-primary btn-lg" href="{{ url_for('isi') }}">

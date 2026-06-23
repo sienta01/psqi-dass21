@@ -21,6 +21,8 @@ def _build_spec():
     # Metadata
     spec.append(("ID", lambda data, skor: skor.get("_id", "")))
     spec.append(("Waktu Input", lambda data, skor: skor.get("_created_at", "")))
+    spec.append(("Fase", lambda data, skor: skor.get("_fase", "")))
+    spec.append(("ID Pasien (Awal)", lambda data, skor: skor.get("_pasien_id", "")))
 
     # Karakteristik pasien
     for f in Q.PASIEN_FIELDS:
@@ -73,6 +75,18 @@ def _build_spec():
         spec.append(("DASS " + label + " (skor x2)", dass_val(sub, "skor")))
         spec.append(("DASS " + label + " (kategori)", dass_val(sub, "kategori")))
 
+    # MoCA-Ina: skor tiap domain
+    def moca_domain(key):
+        return lambda data, skor, k=key: skor.get("moca", {}).get("domains", {}).get(k, "")
+    for name, label, maks, deskripsi in Q.MOCA_DOMAINS:
+        spec.append(("MoCA " + label + " (maks " + str(maks) + ")", moca_domain(name)))
+    spec.append(("MoCA Penyesuaian Pendidikan",
+                 lambda data, skor: skor.get("moca", {}).get("penyesuaian_pendidikan", "")))
+    spec.append(("MoCA Total",
+                 lambda data, skor: skor.get("moca", {}).get("total", "")))
+    spec.append(("MoCA Interpretasi",
+                 lambda data, skor: skor.get("moca", {}).get("interpretasi", "")))
+
     return spec
 
 
@@ -84,6 +98,11 @@ def _record_to_dict(row):
     skor = json.loads(row["skor_json"])
     skor["_id"] = row["id"]
     skor["_created_at"] = row["created_at"]
+    keys = row.keys()
+    fase = row["fase"] if "fase" in keys and row["fase"] else "awal"
+    skor["_fase"] = fase
+    parent = row["parent_id"] if "parent_id" in keys else None
+    skor["_pasien_id"] = row["id"] if fase == "awal" else parent
     return data, skor
 
 

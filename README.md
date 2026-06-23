@@ -10,10 +10,15 @@ Indonesia.
 
 ## Fitur
 
-- **Kuesioner 3 bagian** dengan tampilan bertahap (wizard): Data Pasien → PSQI → DASS-21.
+- **Kuesioner 4 bagian** dengan tampilan bertahap (wizard): Data Pasien → PSQI → DASS-21 → MoCA-Ina.
 - **Penghitungan skor otomatis**
   - PSQI: 7 komponen + skor global (0–21). Skor > 5 = kualitas tidur buruk.
   - DASS-21: subskala Depresi, Cemas, Stres (skor ×2) + kategori (Normal s/d Sangat Berat).
+  - MoCA-Ina: rincian 7 domain kognitif + total (0–30) + interpretasi. Skor ≥ 26 = normal.
+- **Desain longitudinal (2 kali ukur)** — tiap pasien diukur **Awal** (baseline)
+  dan **Akhir**. Pengukuran akhir ditambah dari admin dengan memilih pasien dari
+  daftar; data karakteristik tersalin otomatis dari baseline. Tersedia **halaman
+  perbandingan Awal vs Akhir** lengkap dengan selisih (perubahan) tiap skor.
 - **Validasi isian** di sisi browser dan server.
 - **Halaman hasil** dengan rincian skor dan interpretasi (bisa dicetak/PDF).
 - **Halaman admin** (dengan password) untuk melihat seluruh data dan **ekspor CSV**.
@@ -26,7 +31,7 @@ Indonesia.
 ```
 psqi-dass21/
 ├── app.py                  # Aplikasi Flask (rute/halaman)
-├── scoring.py              # Logika perhitungan PSQI & DASS-21
+├── scoring.py              # Logika perhitungan PSQI, DASS-21 & MoCA-Ina
 ├── questions.py            # Seluruh pertanyaan & pilihan (Bahasa Indonesia)
 ├── db.py                   # Penyimpanan SQLite
 ├── export.py               # Ekspor data ke CSV
@@ -142,12 +147,34 @@ Karena aplikasi menyimpan data pasien (termasuk identitas), lakukan hal berikut:
 ## Cara Pakai
 
 - **Untuk responden / petugas**: buka beranda → **Mulai Mengisi Kuesioner**,
-  atau langsung ke `/isi`. Isi 3 bagian, lalu **Kirim** untuk melihat hasil.
+  atau langsung ke `/isi`. Isi 4 bagian, lalu **Kirim** untuk melihat hasil.
+  Hanya **Tanggal Pengambilan** dan **Nama Responden** yang wajib; bagian
+  lain (termasuk MoCA-Ina) boleh dikosongkan.
 - **Untuk peneliti (admin)**: klik **Admin** → masuk dengan password →
-  lihat tabel **Data Responden** → **Ekspor CSV** untuk analisis.
-  Pada tiap baris tersedia **Detail** (melihat/mencetak rincian) dan **Edit**
-  (mengubah jawaban responden — skor PSQI & DASS-21 dihitung ulang otomatis,
-  dan data tidak diduplikasi). Menghapus data dilakukan dari halaman Detail.
+  lihat tabel **Data Pasien** (satu baris per pasien) → **Ekspor CSV** untuk analisis.
+  Pada tiap baris tersedia **Detail**, **Edit** (skor dihitung ulang otomatis,
+  data tidak diduplikasi), dan tombol **+ Akhir** / **Banding**.
+  Menghapus pasien (dari halaman Detail) ikut menghapus pengukuran akhirnya.
+
+### Alur pengukuran Awal & Akhir (longitudinal)
+
+1. **Pengukuran awal (baseline)** diisi lewat halaman `/isi` seperti biasa →
+   otomatis tercatat sebagai fase **Awal** dan membuat satu "pasien".
+2. **Pengukuran akhir** — saat login sebagai **admin**, buka `/isi` lalu mulai
+   mengetik nama di kolom **Nama Responden**. Pasien yang cocok akan muncul
+   sebagai daftar; **pilih** salah satu (klik, atau navigasi dengan tombol
+   **↑/↓** lalu **Enter**) → formulir berubah ke mode *Pengukuran Akhir*, data
+   karakteristik **tersalin otomatis** dari baseline, dan Anda tinggal mengisi
+   PSQI, DASS-21, dan MoCA-Ina. Menekan **Enter** saat tidak ada pasien yang
+   cocok akan **lanjut sebagai pasien baru**. Alternatif: tombol **+ Akhir**
+   pada tabel admin.
+   > Catatan privasi: pencarian nama hanya muncul untuk admin yang login.
+   > Pengunjung biasa di `/isi` hanya melihat kolom nama biasa.
+3. Setelah tersimpan, buka **Banding** untuk melihat **perbandingan Awal vs
+   Akhir** beserta selisih tiap skor (ditandai *membaik* / *memburuk*).
+4. **Ekspor CSV** berisi kolom **Fase** (Awal/Akhir) dan **ID Pasien (Awal)**
+   sehingga pasangan pengukuran tiap pasien mudah dianalisis (mis. uji
+   berpasangan di SPSS).
 
 ---
 
@@ -174,6 +201,25 @@ diinterpretasi dengan ambang:
 | Sedang       | 14–20   | 10–14 | 19–25 |
 | Berat        | 21–27   | 15–19 | 26–33 |
 | Sangat Berat | 28+     | 20+   | 34+   |
+
+**MoCA-Ina** — skor dimasukkan per domain kognitif, dijumlahkan menjadi total
+(maksimal 30):
+
+| Domain | Skor maks |
+|--------|-----------|
+| Visuospasial / Eksekutif | 5 |
+| Penamaan (Naming) | 3 |
+| Atensi (Attention) | 6 |
+| Bahasa (Language) | 3 |
+| Abstraksi (Abstraction) | 2 |
+| Memori / Recall Tertunda | 5 |
+| Orientasi (Orientation) | 6 |
+
+Penyesuaian pendidikan **+1** bila pendidikan formal ≤ 12 tahun (total tetap
+maksimal 30). **Nilai potong: total ≥ 26 = fungsi kognitif normal**, di bawah
+itu menandakan gangguan kognitif. Bila seluruh domain dikosongkan, MoCA-Ina
+dicatat sebagai "tidak dinilai". Nilai potong & penyesuaian dapat diubah di
+`scoring.py` (`MOCA_CUTOFF`).
 
 ---
 

@@ -9,7 +9,7 @@ from functools import wraps
 
 from flask import (
     Flask, render_template, request, redirect, url_for, session,
-    flash, abort, Response,
+    flash, abort, Response, jsonify,
 )
 
 import db
@@ -17,7 +17,8 @@ import export
 import questions as Q
 from config import Config
 from scoring import (
-    hitung_semua, PSQI_KOMPONEN_LABEL, DASS_SUBSKALA_LABEL,
+    hitung_semua, bandingkan, PSQI_KOMPONEN_LABEL, DASS_SUBSKALA_LABEL,
+    MOCA_DOMAIN_LABEL,
 )
 
 app = Flask(__name__)
@@ -48,20 +49,39 @@ def _expected_fields():
     names.append(Q.PSQI_Q11E_OTHER)
     for nomor, _, _ in Q.DASS_ITEMS:
         names.append("dass_q" + str(nomor))
+    for name, _, _, _ in Q.MOCA_DOMAINS:
+        names.append(name)
+    names.append(Q.MOCA_EDU_FIELD)
     return names
 
 
 EXPECTED_FIELDS = _expected_fields()
 
 # Field wajib (backstop di sisi server; HTML `required` adalah lini pertama).
-REQUIRED_FIELDS = (
-    [f["name"] for f in Q.PASIEN_FIELDS if f.get("required")]
-    + [item["name"] for item in Q.PSQI_ISIAN]
-    + ["psqi_q5a", "psqi_q5b", "psqi_q5c", "psqi_q5d", "psqi_q5e",
-       "psqi_q5f", "psqi_q5g", "psqi_q5h", "psqi_q5i"]
-    + ["psqi_q6", "psqi_q7", "psqi_q8", "psqi_q9"]
-    + ["dass_q" + str(n) for n, _, _ in Q.DASS_ITEMS]
-)
+# Hanya "Tanggal Pengambilan" & "Nama Responden" yang wajib; sisanya opsional.
+REQUIRED_FIELDS = [f["name"] for f in Q.PASIEN_FIELDS if f.get("required")]
+
+
+def _demographic_fields():
+    """Nama field karakteristik pasien (untuk disalin ke pengukuran akhir)."""
+    names = []
+    for f in Q.PASIEN_FIELDS:
+        names.append(f["name"])
+        if f["type"] == "radio_other":
+            names.append(f["other_name"])
+    return names
+
+
+DEMOGRAPHIC_FIELDS = _demographic_fields()
+
+FASE_LABEL = {"awal": "Pengukuran Awal", "akhir": "Pengukuran Akhir"}
+
+
+def _row_fase(row):
+    try:
+        return row["fase"] or "awal"
+    except (KeyError, IndexError):
+        return "awal"
 
 
 # ---------------------------------------------------------------------------
@@ -115,21 +135,43 @@ def _collect_and_validate():
     return values, errors
 
 
+def _resolve_parent(is_admin):
+    """Validasi field tersembunyi `parent_id` untuk penautan pengukuran akhir.
+
+    Hanya admin yang boleh menautkan; parent harus pengukuran AWAL yang valid
+    dan belum punya akhir. Kembalikan (fase, parent_id, raw_value)."""
+    raw = (request.form.get("parent_id") or "").strip()
+    if is_admin and raw.isdigit():
+        awal = db.ambil_satu(int(raw))
+        if (awal is not None and _row_fase(awal) == "awal"
+                and db.ambil_akhir(int(raw)) is None):
+            return "akhir", int(raw), raw
+    return "awal", None, raw
+
+
 @app.route("/isi", methods=["GET", "POST"])
 def isi():
     values = {}
     errors = []
+    is_admin = bool(session.get("is_admin"))
 
     if request.method == "POST":
         if not _check_csrf():
             abort(400, "Token formulir tidak valid. Muat ulang halaman.")
 
         values, errors = _collect_and_validate()
+        fase, parent_id, raw_parent = _resolve_parent(is_admin)
         if not errors:
             skor = hitung_semua(values)
-            resp_id = db.simpan_response(values, skor)
+            resp_id = db.simpan_response(values, skor, fase=fase,
+                                         parent_id=parent_id)
+            if fase == "akhir":
+                flash("Pengukuran akhir tersimpan.", "ok")
+                return redirect(url_for("admin_banding", pasien_id=parent_id))
             return redirect(url_for("hasil", resp_id=resp_id))
 
+        # Pertahankan tautan pengukuran akhir saat render ulang.
+        values["parent_id"] = raw_parent
         flash("Masih ada pertanyaan wajib yang belum diisi. "
               "Bagian yang belum lengkap ditandai.", "error")
     else:
@@ -137,8 +179,36 @@ def isi():
 
     return render_template(
         "form.html", Q=Q, values=values, errors=set(errors),
-        form_action=url_for("isi"),
+        form_action=url_for("isi"), fase="awal", can_search=is_admin,
     )
+
+
+@app.route("/admin/cari-pasien")
+@login_required
+def admin_cari_pasien():
+    """Autolengkap: cari pasien (pengukuran awal tanpa akhir) untuk ditautkan."""
+    q = (request.args.get("q") or "").strip()
+    if len(q) < 2:
+        return jsonify([])
+    rows = db.cari_pasien(q)
+    return jsonify([
+        {"id": r["id"], "nama": r["nama"], "no_rm": r["no_rm"],
+         "tanggal": r["tanggal"], "usia": r["usia"]}
+        for r in rows
+    ])
+
+
+@app.route("/admin/pasien/<int:pasien_id>/data")
+@login_required
+def admin_pasien_data(pasien_id):
+    """Kembalikan data demografi satu pasien (untuk mengisi otomatis form akhir)."""
+    row = db.ambil_satu(pasien_id)
+    if row is None or _row_fase(row) != "awal":
+        abort(404)
+    import json
+    data = json.loads(row["data_json"])
+    demografi = {k: data.get(k, "") for k in DEMOGRAPHIC_FIELDS}
+    return jsonify({"nama": row["nama"], "demografi": demografi})
 
 
 @app.route("/hasil/<int:resp_id>")
@@ -149,10 +219,13 @@ def hasil(resp_id):
     import json
     data = json.loads(row["data_json"])
     skor = json.loads(row["skor_json"])
+    fase = _row_fase(row)
     return render_template(
         "hasil.html", data=data, skor=skor, resp_id=resp_id,
         psqi_label=PSQI_KOMPONEN_LABEL, dass_label=DASS_SUBSKALA_LABEL,
+        moca_label=MOCA_DOMAIN_LABEL,
         dass_tabel=Q.DASS_TABEL_INTERPRETASI, public=True,
+        fase=fase, fase_label=FASE_LABEL.get(fase, ""),
     )
 
 
@@ -183,8 +256,8 @@ def admin_logout():
 @app.route("/admin")
 @login_required
 def admin():
-    rows = db.ambil_semua()
-    return render_template("admin.html", rows=rows, total=len(rows))
+    pasien = db.ambil_pasien_list()
+    return render_template("admin.html", pasien=pasien, total=len(pasien))
 
 
 @app.route("/admin/detail/<int:resp_id>")
@@ -196,11 +269,23 @@ def admin_detail(resp_id):
     import json
     data = json.loads(row["data_json"])
     skor = json.loads(row["skor_json"])
+    fase = _row_fase(row)
+
+    # Konteks longitudinal: id pasien (pengukuran awal) & ketersediaan banding.
+    pid = resp_id if fase == "awal" else row["parent_id"]
+    akhir = db.ambil_akhir(pid) if pid else None
+    banding_ada = pid is not None and akhir is not None
+    bisa_tambah_akhir = fase == "awal" and akhir is None
+
     return render_template(
         "hasil.html", data=data, skor=skor, resp_id=resp_id,
         psqi_label=PSQI_KOMPONEN_LABEL, dass_label=DASS_SUBSKALA_LABEL,
+        moca_label=MOCA_DOMAIN_LABEL,
         dass_tabel=Q.DASS_TABEL_INTERPRETASI, public=False,
         created_at=row["created_at"],
+        fase=fase, fase_label=FASE_LABEL.get(fase, ""),
+        pasien_id=pid, banding_ada=banding_ada,
+        bisa_tambah_akhir=bisa_tambah_akhir,
     )
 
 
@@ -227,10 +312,75 @@ def admin_edit(resp_id):
     else:
         values = json.loads(row["data_json"])
 
+    fase = _row_fase(row)
     return render_template(
         "form.html", Q=Q, values=values, errors=set(errors),
         form_action=url_for("admin_edit", resp_id=resp_id),
         edit_id=resp_id, edit_nama=row["nama"],
+        fase=fase, fase_label=FASE_LABEL.get(fase, ""),
+    )
+
+
+@app.route("/admin/pasien/<int:pasien_id>/akhir", methods=["GET", "POST"])
+@login_required
+def admin_akhir(pasien_id):
+    """Tambah pengukuran AKHIR untuk pasien (pengukuran awal) tertentu."""
+    awal = db.ambil_satu(pasien_id)
+    if awal is None or _row_fase(awal) != "awal":
+        abort(404)
+    if db.ambil_akhir(pasien_id) is not None:
+        flash("Pasien ini sudah memiliki pengukuran akhir.", "error")
+        return redirect(url_for("admin_banding", pasien_id=pasien_id))
+
+    import json
+    errors = []
+    if request.method == "POST":
+        if not _check_csrf():
+            abort(400)
+        values, errors = _collect_and_validate()
+        if not errors:
+            skor = hitung_semua(values)
+            db.simpan_response(values, skor, fase="akhir", parent_id=pasien_id)
+            flash("Pengukuran akhir berhasil disimpan.", "ok")
+            return redirect(url_for("admin_banding", pasien_id=pasien_id))
+        flash("Masih ada pertanyaan wajib yang belum diisi. "
+              "Bagian yang belum lengkap ditandai.", "error")
+    else:
+        # Salin demografi dari pengukuran awal; tanggal default = hari ini.
+        awal_data = json.loads(awal["data_json"])
+        values = {k: awal_data.get(k, "") for k in DEMOGRAPHIC_FIELDS}
+        values["tanggal"] = date.today().isoformat()
+
+    return render_template(
+        "form.html", Q=Q, values=values, errors=set(errors),
+        form_action=url_for("admin_akhir", pasien_id=pasien_id),
+        fase="akhir", fase_label=FASE_LABEL["akhir"],
+        akhir_nama=awal["nama"], akhir_pasien_id=pasien_id,
+    )
+
+
+@app.route("/admin/banding/<int:pasien_id>")
+@login_required
+def admin_banding(pasien_id):
+    """Halaman perbandingan Awal vs Akhir untuk satu pasien."""
+    awal = db.ambil_satu(pasien_id)
+    if awal is None or _row_fase(awal) != "awal":
+        abort(404)
+    akhir = db.ambil_akhir(pasien_id)
+    if akhir is None:
+        flash("Pasien ini belum memiliki pengukuran akhir.", "error")
+        return redirect(url_for("admin_detail", resp_id=pasien_id))
+
+    import json
+    data = json.loads(awal["data_json"])
+    skor_awal = json.loads(awal["skor_json"])
+    skor_akhir = json.loads(akhir["skor_json"])
+    perbandingan = bandingkan(skor_awal, skor_akhir)
+    return render_template(
+        "banding.html", data=data, perbandingan=perbandingan,
+        awal=awal, akhir=akhir, pasien_id=pasien_id,
+        psqi_label=PSQI_KOMPONEN_LABEL, dass_label=DASS_SUBSKALA_LABEL,
+        moca_label=MOCA_DOMAIN_LABEL,
     )
 
 

@@ -259,11 +259,157 @@ DASS_SUBSKALA_LABEL = {
 
 
 # ----------------------------------------------------------------------------
+# MoCA-Ina  (Montreal Cognitive Assessment - versi Indonesia)
+# ----------------------------------------------------------------------------
+# 7 domain kognitif, total 30. Tambahan +1 bila pendidikan formal <= 12 tahun
+# (maksimal tetap 30). Nilai potong baku: >= 26 = normal.
+MOCA_DOMAIN_MAX = {
+    "moca_visuospatial": 5,   # trail making, kubus, gambar jam
+    "moca_naming": 3,         # menyebut 3 hewan
+    "moca_attention": 6,      # rentang angka, kewaspadaan, serial 7
+    "moca_language": 3,       # pengulangan kalimat, kelancaran verbal
+    "moca_abstraction": 2,    # kemiripan dua benda
+    "moca_recall": 5,         # recall tertunda 5 kata
+    "moca_orientation": 6,    # tanggal, bulan, tahun, hari, tempat, kota
+}
+MOCA_TOTAL_MAX = 30
+MOCA_CUTOFF = 26  # >= 26 dianggap normal
+
+
+def _is_filled(value):
+    return value is not None and str(value).strip() != ""
+
+
+def _truthy(value):
+    return str(value).strip().lower() not in ("", "0", "false", "no", "tidak")
+
+
+def hitung_moca(ans: dict) -> dict:
+    """Hitung skor MoCA-Ina per domain + total + interpretasi.
+
+    Bila tidak ada satu pun domain yang diisi (dan tanpa penyesuaian
+    pendidikan), MoCA dianggap TIDAK dinilai (`dinilai=False`).
+    """
+    domains = {}
+    raw_sum = 0
+    any_filled = False
+
+    for name, maxv in MOCA_DOMAIN_MAX.items():
+        if _is_filled(ans.get(name)):
+            any_filled = True
+        v = _to_int(ans.get(name))
+        v = max(0, min(v, maxv))  # batasi 0..maks
+        domains[name] = v
+        raw_sum += v
+
+    edu = _is_filled(ans.get("moca_edu_adjust")) and _truthy(ans.get("moca_edu_adjust"))
+    if edu:
+        any_filled = True
+
+    if not any_filled:
+        return {"dinilai": False}
+
+    total = min(raw_sum + (1 if edu else 0), MOCA_TOTAL_MAX)
+    normal = total >= MOCA_CUTOFF
+    return {
+        "dinilai": True,
+        "domains": domains,
+        "penyesuaian_pendidikan": 1 if edu else 0,
+        "total": total,
+        "normal": normal,
+        "interpretasi": (
+            "Fungsi kognitif normal"
+            if normal
+            else "Terdapat gangguan fungsi kognitif (di bawah nilai potong %d)"
+            % MOCA_CUTOFF
+        ),
+    }
+
+
+MOCA_DOMAIN_LABEL = {
+    "moca_visuospatial": "Visuospasial / Eksekutif",
+    "moca_naming": "Penamaan (Naming)",
+    "moca_attention": "Atensi (Attention)",
+    "moca_language": "Bahasa (Language)",
+    "moca_abstraction": "Abstraksi (Abstraction)",
+    "moca_recall": "Memori / Recall Tertunda",
+    "moca_orientation": "Orientasi (Orientation)",
+}
+
+
+# ----------------------------------------------------------------------------
 # Gabungan
 # ----------------------------------------------------------------------------
 def hitung_semua(ans: dict) -> dict:
-    """Hitung PSQI + DASS-21 sekaligus."""
+    """Hitung PSQI + DASS-21 + MoCA-Ina sekaligus."""
     return {
         "psqi": hitung_psqi(ans),
         "dass21": hitung_dass21(ans),
+        "moca": hitung_moca(ans),
     }
+
+
+# ----------------------------------------------------------------------------
+# Perbandingan dua pengukuran (Awal vs Akhir)
+# ----------------------------------------------------------------------------
+def _delta(awal, akhir):
+    if awal is None or akhir is None:
+        return None
+    return akhir - awal
+
+
+def _arah(delta, lebih_baik_bila_turun):
+    """Tentukan apakah perubahan = membaik / memburuk / tetap.
+
+    `lebih_baik_bila_turun`: True untuk PSQI & DASS (skor turun = membaik);
+    False untuk MoCA (skor naik = membaik).
+    """
+    if delta is None or delta == 0:
+        return "tetap"
+    membaik = (delta < 0) if lebih_baik_bila_turun else (delta > 0)
+    return "membaik" if membaik else "memburuk"
+
+
+def bandingkan(awal: dict, akhir: dict) -> dict:
+    """Bandingkan skor dua pengukuran. Mengembalikan selisih (akhir - awal)
+    dan arah perubahan untuk PSQI, DASS-21, dan MoCA-Ina."""
+    hasil = {}
+
+    pa, pk = awal.get("psqi", {}), akhir.get("psqi", {})
+    d = _delta(pa.get("skor_global"), pk.get("skor_global"))
+    hasil["psqi"] = {
+        "awal": pa.get("skor_global"), "akhir": pk.get("skor_global"),
+        "delta": d, "arah": _arah(d, True),
+        "awal_interpretasi": pa.get("interpretasi"),
+        "akhir_interpretasi": pk.get("interpretasi"),
+    }
+
+    hasil["dass"] = {}
+    for sub in ("depresi", "cemas", "stres"):
+        da = awal.get("dass21", {}).get(sub, {})
+        dk = akhir.get("dass21", {}).get(sub, {})
+        d = _delta(da.get("skor"), dk.get("skor"))
+        hasil["dass"][sub] = {
+            "awal": da.get("skor"), "akhir": dk.get("skor"),
+            "awal_kat": da.get("kategori"), "akhir_kat": dk.get("kategori"),
+            "delta": d, "arah": _arah(d, True),
+        }
+
+    ma, mk = awal.get("moca", {}), akhir.get("moca", {})
+    if ma.get("dinilai") and mk.get("dinilai"):
+        d = _delta(ma.get("total"), mk.get("total"))
+        domains = {}
+        for key in MOCA_DOMAIN_MAX:
+            va = ma.get("domains", {}).get(key)
+            vk = mk.get("domains", {}).get(key)
+            domains[key] = {"awal": va, "akhir": vk, "delta": _delta(va, vk)}
+        hasil["moca"] = {
+            "dinilai": True, "awal": ma.get("total"), "akhir": mk.get("total"),
+            "delta": d, "arah": _arah(d, False), "domains": domains,
+            "awal_interpretasi": ma.get("interpretasi"),
+            "akhir_interpretasi": mk.get("interpretasi"),
+        }
+    else:
+        hasil["moca"] = {"dinilai": False}
+
+    return hasil

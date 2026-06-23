@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}Perbandingan Awal vs Akhir — {{ app_title }}{% endblock %}
+
+{% macro delta(d) %}
+  {% if d.delta is none %}
+    <span class="muted">–</span>
+  {% else %}
+    <span class="delta delta-{{ d.arah }}">
+      {{ '+' if d.delta > 0 else ('' if d.delta < 0 else '±') }}{{ d.delta }}
+      <small>{{ d.arah }}</small>
+    </span>
+  {% endif %}
+{% endmacro %}
+
+{% block content %}
+<div class="result-head">
+  <h1>Perbandingan Awal vs Akhir</h1>
+  <div class="result-meta">
+    <span><b>Nama:</b> {{ data.get('nama', '-') }}</span>
+    <span><b>No. RM:</b> {{ data.get('no_rm') or '-' }}</span>
+    <span><b>Tgl Awal:</b> {{ awal['tanggal'] or '-' }}</span>
+    <span><b>Tgl Akhir:</b> {{ akhir['tanggal'] or '-' }}</span>
+  </div>
+</div>
+
+{# ---------------- PSQI ---------------- #}
+<section class="result-card">
+  <h2>PSQI — Kualitas Tidur</h2>
+  <table class="table table-banding">
+    <thead>
+      <tr><th>Ukuran</th><th class="num">Awal</th><th class="num">Akhir</th><th class="num">Perubahan</th></tr>
+    </thead>
+    <tbody>
+      <tr class="row-total">
+        <td>Skor Global PSQI (0–21)</td>
+        <td class="num">{{ perbandingan.psqi.awal }}</td>
+        <td class="num">{{ perbandingan.psqi.akhir }}</td>
+        <td class="num">{{ delta(perbandingan.psqi) }}</td>
+      </tr>
+      <tr>
+        <td>Interpretasi</td>
+        <td>{{ perbandingan.psqi.awal_interpretasi }}</td>
+        <td>{{ perbandingan.psqi.akhir_interpretasi }}</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="muted small">Skor PSQI lebih rendah = lebih baik.</p>
+</section>
+
+{# ---------------- DASS-21 ---------------- #}
+<section class="result-card">
+  <h2>DASS-21 — Depresi, Cemas, Stres</h2>
+  <table class="table table-banding">
+    <thead>
+      <tr><th>Subskala</th><th class="num">Awal</th><th class="num">Akhir</th><th class="num">Perubahan</th></tr>
+    </thead>
+    <tbody>
+      {% for sub, label in dass_label.items() %}
+        {% set d = perbandingan.dass[sub] %}
+        <tr>
+          <td>{{ label }}</td>
+          <td class="num">{{ d.awal }} <small>{{ d.awal_kat }}</small></td>
+          <td class="num">{{ d.akhir }} <small>{{ d.akhir_kat }}</small></td>
+          <td class="num">{{ delta(d) }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="muted small">Skor DASS lebih rendah = lebih baik.</p>
+</section>
+
+{# ---------------- MoCA-Ina ---------------- #}
+<section class="result-card">
+  <h2>MoCA-Ina — Fungsi Kognitif</h2>
+  {% if perbandingan.moca.dinilai %}
+    <table class="table table-banding">
+      <thead>
+        <tr><th>Domain</th><th class="num">Awal</th><th class="num">Akhir</th><th class="num">Perubahan</th></tr>
+      </thead>
+      <tbody>
+        {% for key, label in moca_label.items() %}
+          {% set dom = perbandingan.moca.domains[key] %}
+          <tr>
+            <td>{{ label }}</td>
+            <td class="num">{{ dom.awal }}</td>
+            <td class="num">{{ dom.akhir }}</td>
+            <td class="num">{% if dom.delta is not none %}{{ '+' if dom.delta > 0 else ('±' if dom.delta == 0 else '') }}{{ dom.delta }}{% else %}–{% endif %}</td>
+          </tr>
+        {% endfor %}
+        <tr class="row-total">
+          <td>Total MoCA-Ina (0–30)</td>
+          <td class="num">{{ perbandingan.moca.awal }}</td>
+          <td class="num">{{ perbandingan.moca.akhir }}</td>
+          <td class="num">{{ delta(perbandingan.moca) }}</td>
+        </tr>
+        <tr>
+          <td>Interpretasi</td>
+          <td>{{ perbandingan.moca.awal_interpretasi }}</td>
+          <td>{{ perbandingan.moca.akhir_interpretasi }}</td>
+          <td></td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="muted small">Skor MoCA lebih tinggi = lebih baik.</p>
+  {% else %}
+    <p class="muted">MoCA-Ina tidak dinilai pada salah satu atau kedua pengukuran,
+      sehingga perbandingan tidak tersedia.</p>
+  {% endif %}
+</section>
+
+<div class="result-actions">
+  <a class="btn btn-ghost" href="{{ url_for('admin') }}">← Kembali ke Data</a>
+  <a class="btn btn-ghost" href="{{ url_for('admin_detail', resp_id=awal['id']) }}">Detail Awal</a>
+  <a class="btn btn-ghost" href="{{ url_for('admin_detail', resp_id=akhir['id']) }}">Detail Akhir</a>
+  <button class="btn btn-ghost" onclick="window.print()">Cetak / PDF</button>
+</div>
+{% endblock %}

@@ -3,7 +3,9 @@
 {% block content %}
 
 <div class="result-head">
-  <h1>Hasil Penilaian</h1>
+  <h1>Hasil Penilaian
+    {% if fase_label %}<span class="fase-pill fase-{{ fase }}">{{ fase_label }}</span>{% endif %}
+  </h1>
   <div class="result-meta">
     <span><b>Nama:</b> {{ data.get('nama', '-') }}</span>
     <span><b>No. RM:</b> {{ data.get('no_rm') or '-' }}</span>
@@ -78,6 +80,44 @@
   </details>
 </section>
 
+{# ---------------- MoCA-Ina ---------------- #}
+<section class="result-card">
+  <h2>MoCA-Ina — Fungsi Kognitif</h2>
+  {% if skor.moca and skor.moca.dinilai %}
+    <div class="score-banner {{ 'good' if skor.moca.normal else 'bad' }}">
+      <div class="score-big">{{ skor.moca.total }}<span>/30</span></div>
+      <div class="score-text">
+        <strong>{{ skor.moca.interpretasi }}</strong>
+        <span class="muted">Nilai potong ≥ 26 menunjukkan fungsi kognitif normal.</span>
+      </div>
+    </div>
+
+    <table class="table">
+      <thead><tr><th>Domain Kognitif</th><th class="num">Skor</th></tr></thead>
+      <tbody>
+        {% for key, label in moca_label.items() %}
+          <tr>
+            <td>{{ label }}</td>
+            <td class="num">{{ skor.moca.domains[key] }}</td>
+          </tr>
+        {% endfor %}
+        {% if skor.moca.penyesuaian_pendidikan %}
+          <tr>
+            <td>Penyesuaian pendidikan (≤ 12 tahun)</td>
+            <td class="num">+{{ skor.moca.penyesuaian_pendidikan }}</td>
+          </tr>
+        {% endif %}
+        <tr class="row-total">
+          <td>Total MoCA-Ina</td>
+          <td class="num">{{ skor.moca.total }}</td>
+        </tr>
+      </tbody>
+    </table>
+  {% else %}
+    <p class="muted">MoCA-Ina tidak dinilai untuk responden ini.</p>
+  {% endif %}
+</section>
+
 <div class="result-actions">
   {% if public %}
     <a class="btn btn-primary" href="{{ url_for('isi') }}">Isi Responden Baru</a>
@@ -85,6 +125,12 @@
   {% else %}
     <a class="btn btn-ghost" href="{{ url_for('admin') }}">← Kembali ke Data</a>
     <a class="btn btn-primary" href="{{ url_for('admin_edit', resp_id=resp_id) }}">✎ Edit Data</a>
+    {% if bisa_tambah_akhir %}
+      <a class="btn btn-success" href="{{ url_for('admin_akhir', pasien_id=pasien_id) }}">+ Pengukuran Akhir</a>
+    {% endif %}
+    {% if banding_ada %}
+      <a class="btn btn-success" href="{{ url_for('admin_banding', pasien_id=pasien_id) }}">⇄ Bandingkan Awal vs Akhir</a>
+    {% endif %}
     <button class="btn btn-ghost" onclick="window.print()">Cetak / PDF</button>
     <form method="POST" action="{{ url_for('admin_hapus', resp_id=resp_id) }}"
           onsubmit="return confirm('Hapus data responden #{{ resp_id }}? Tindakan ini tidak dapat dibatalkan.');"

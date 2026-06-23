@@ -17,6 +17,9 @@
 
 * { box-sizing: border-box; }
 
+/* Hormati atribut `hidden` walau elemen punya rule display dari kelasnya. */
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -217,6 +220,23 @@ main.container { padding: 1.6rem 0 1rem; }
 .has-error .scale, .has-error .optlist { box-shadow: 0 0 0 2px #f5c6c0; border-radius: 8px; }
 .matrix-row.has-error, .dass-row.has-error { background: #fdecea; }
 
+/* ============ MoCA-Ina ============ */
+.moca-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: .9rem; margin-bottom: 1rem;
+}
+.moca-field {
+  border: 1px solid var(--line); border-radius: var(--radius);
+  padding: .8rem .9rem; background: var(--white); margin-bottom: 0;
+}
+.moca-field .field-label { margin-bottom: .2rem; }
+.moca-desc { margin: 0 0 .5rem; font-size: .82rem; }
+.input-xs { width: 80px; text-align: center; }
+.moca-edu { background: var(--blue-light); border: 1px solid #cfe0f3;
+  border-radius: var(--radius); padding: .7rem .9rem; }
+.moca-edu .opt { border: none; background: transparent; }
+.moca-edu .opt:hover { background: transparent; }
+
 /* ============ Hasil ============ */
 .result-head h1 { margin-bottom: .3rem; color: var(--blue-dark); }
 .result-meta { display: flex; flex-wrap: wrap; gap: 1rem; color: var(--muted); font-size: .9rem; }
@@ -285,6 +305,45 @@ main.container { padding: 1.6rem 0 1rem; }
   padding: .6rem 1rem; border-radius: var(--radius); margin-bottom: 1rem;
   font-size: .92rem;
 }
+
+/* ============ Autolengkap Nama (cari pasien) ============ */
+.autocomplete { position: relative; }
+.ac-list {
+  position: absolute; left: 0; right: 0; top: 100%; z-index: 30;
+  background: var(--white); border: 1px solid var(--blue); border-top: none;
+  border-radius: 0 0 8px 8px; box-shadow: var(--shadow);
+  max-height: 260px; overflow-y: auto;
+}
+.ac-item {
+  display: flex; justify-content: space-between; align-items: center; gap: 1rem;
+  padding: .55rem .7rem; cursor: pointer; border-bottom: 1px solid var(--line);
+}
+.ac-item:last-child { border-bottom: none; }
+.ac-item:hover, .ac-item.active { background: var(--blue-light); }
+.ac-nama { font-weight: 600; }
+.ac-meta { color: var(--muted); font-size: .8rem; white-space: nowrap; }
+
+/* ============ Longitudinal (Awal vs Akhir) ============ */
+.akhir-banner { background: #e7f6ee; border-color: #b9e6cd; color: #1f6b46; }
+
+.fase-pill {
+  font-size: .72rem; font-weight: 700; padding: .2rem .6rem; border-radius: 20px;
+  vertical-align: middle; margin-left: .5rem;
+}
+.fase-awal { background: var(--blue-light); color: var(--blue-dark); }
+.fase-akhir { background: #e7f6ee; color: var(--green); }
+
+.tag-pending { background: #fff4e0; color: var(--amber); }
+.arrow { color: var(--muted); font-weight: 400; }
+.link-add { color: var(--green); font-weight: 700; }
+
+.table-banding td, .table-banding th { vertical-align: middle; }
+.table-banding small { display: block; color: var(--muted); font-weight: 400; font-size: .75rem; }
+.delta { font-weight: 700; white-space: nowrap; }
+.delta small { display: inline; font-weight: 600; font-size: .72rem; margin-left: .2rem; }
+.delta-membaik { color: var(--green); }
+.delta-memburuk { color: var(--red); }
+.delta-tetap { color: var(--muted); }
 
 /* ============ Login / Error ============ */
 .login-box, .error-box {

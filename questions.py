@@ -13,23 +13,23 @@ PASIEN_FIELDS = [
     {"name": "nama", "label": "Nama Responden", "type": "text", "required": True},
     {"name": "no_rm", "label": "Nomor Rekam Medis", "type": "text", "required": False},
     {"name": "no_telp", "label": "Nomor Telepon", "type": "tel", "required": False},
-    {"name": "usia", "label": "Usia (tahun)", "type": "number", "required": True,
+    {"name": "usia", "label": "Usia (tahun)", "type": "number", "required": False,
      "min": 0, "max": 120},
-    {"name": "jenis_kelamin", "label": "Jenis Kelamin", "type": "radio", "required": True,
+    {"name": "jenis_kelamin", "label": "Jenis Kelamin", "type": "radio", "required": False,
      "options": ["Laki-laki", "Perempuan"]},
-    {"name": "pendidikan", "label": "Pendidikan Terakhir", "type": "radio", "required": True,
+    {"name": "pendidikan", "label": "Pendidikan Terakhir", "type": "radio", "required": False,
      "options": ["SD", "SMP", "SMA", "Sarjana", "Tidak sekolah"]},
     {"name": "pekerjaan", "label": "Pekerjaan", "type": "text", "required": False},
-    {"name": "jenis_stroke", "label": "Jenis Stroke", "type": "radio", "required": True,
+    {"name": "jenis_stroke", "label": "Jenis Stroke", "type": "radio", "required": False,
      "options": ["Stroke Iskemik", "Stroke Hemoragik"]},
-    {"name": "nihss", "label": "NIHSS saat Admisi", "type": "radio", "required": True,
+    {"name": "nihss", "label": "NIHSS saat Admisi", "type": "radio", "required": False,
      "options": [
          "Minor (skor 1-4)",
          "Sedang (skor 5-15)",
          "Sedang-berat (skor 16-20)",
          "Berat (skor 21-42)",
      ]},
-    {"name": "lokasi_lesi", "label": "Lokasi Lesi", "type": "radio", "required": True,
+    {"name": "lokasi_lesi", "label": "Lokasi Lesi", "type": "radio", "required": False,
      "options": [
          "Korteks lobus frontal",
          "Korteks lobus parietal",
@@ -42,13 +42,13 @@ PASIEN_FIELDS = [
          "Subarachnoid",
      ]},
     {"name": "lokasi_lesi_sisi", "label": "Lokasi Lesi (Kanan/Kiri)", "type": "radio",
-     "required": True, "options": ["Kanan", "Kiri"]},
+     "required": False, "options": ["Kanan", "Kiri"]},
     {"name": "intervensi", "label": "Tindakan Intervensi atau Operatif",
-     "type": "radio_other", "required": True, "options": ["Ya", "Tidak"],
+     "type": "radio_other", "required": False, "options": ["Ya", "Tidak"],
      "other_value": "Ya", "other_name": "intervensi_ket",
      "other_label": "Sebutkan tindakan"},
     {"name": "stroke_berulang", "label": "Riwayat Stroke Berulang", "type": "radio",
-     "required": True, "options": ["Ya", "Tidak"]},
+     "required": False, "options": ["Ya", "Tidak"]},
 ]
 
 
@@ -225,3 +225,38 @@ DASS_TABEL_INTERPRETASI = {
         ["Sangat Berat", "28+", "20+", "34+"],
     ],
 }
+
+
+# ---------------------------------------------------------------------------
+# 4) MoCA-Ina (Montreal Cognitive Assessment - versi Indonesia)
+# ---------------------------------------------------------------------------
+MOCA_PETUNJUK = (
+    "Masukkan skor MoCA-Ina untuk setiap domain kognitif sesuai hasil "
+    "pemeriksaan. Total maksimal 30. Centang penyesuaian pendidikan bila "
+    "pendidikan formal pasien ≤ 12 tahun (+1, maksimal tetap 30). "
+    "Nilai potong: skor ≥ 26 dianggap normal. Bagian ini opsional — "
+    "kosongkan bila MoCA tidak dinilai."
+)
+
+# (name, label, max, deskripsi sub-tugas)
+MOCA_DOMAINS = [
+    ("moca_visuospatial", "Visuospasial / Eksekutif", 5,
+     "Alternating trail making, meniru kubus, menggambar jam"),
+    ("moca_naming", "Penamaan (Naming)", 3,
+     "Menyebutkan nama 3 hewan"),
+    ("moca_attention", "Atensi (Attention)", 6,
+     "Rentang angka (maju & mundur), kewaspadaan, pengurangan serial 7"),
+    ("moca_language", "Bahasa (Language)", 3,
+     "Pengulangan kalimat, kelancaran verbal (fonemik)"),
+    ("moca_abstraction", "Abstraksi (Abstraction)", 2,
+     "Kemiripan antara dua benda"),
+    ("moca_recall", "Memori / Recall Tertunda", 5,
+     "Mengingat kembali 5 kata setelah jeda (tanpa isyarat)"),
+    ("moca_orientation", "Orientasi (Orientation)", 6,
+     "Tanggal, bulan, tahun, hari, tempat, dan kota"),
+]
+
+MOCA_EDU_FIELD = "moca_edu_adjust"
+MOCA_EDU_LABEL = "Penyesuaian pendidikan (+1, bila pendidikan formal ≤ 12 tahun)"
+MOCA_TOTAL_MAX = 30
+MOCA_CUTOFF = 26

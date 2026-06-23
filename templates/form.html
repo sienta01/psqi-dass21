@@ -33,18 +33,43 @@
 {% if edit_id %}
   <div class="edit-banner">
     <span>✎ Mode edit — memperbarui data responden
-      <strong>{{ edit_nama or '—' }}</strong> (#{{ edit_id }}).</span>
+      <strong>{{ edit_nama or '—' }}</strong> (#{{ edit_id }}){% if fase %} •
+      {{ fase_label }}{% endif %}.</span>
     <a class="link" href="{{ url_for('admin_detail', resp_id=edit_id) }}">Batal</a>
   </div>
+{% elif fase == 'akhir' %}
+  <div class="edit-banner akhir-banner">
+    <span>📋 <strong>Pengukuran Akhir</strong> untuk pasien
+      <strong>{{ akhir_nama or '—' }}</strong>. Data karakteristik disalin dari
+      pengukuran awal — periksa &amp; perbarui bila perlu, lalu isi PSQI, DASS-21,
+      dan MoCA-Ina.</span>
+    <a class="link" href="{{ url_for('admin_detail', resp_id=akhir_pasien_id) }}">Batal</a>
+  </div>
 {% endif %}
-<form method="POST" action="{{ form_action or url_for('isi') }}" id="kuesioner" novalidate>
+<form method="POST" action="{{ form_action or url_for('isi') }}" id="kuesioner" novalidate
+      {% if can_search %}data-can-search="1"
+      data-cari-url="{{ url_for('admin_cari_pasien') }}"
+      data-pasien-tmpl="{{ url_for('admin_pasien_data', pasien_id=0) }}"{% endif %}>
   <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <input type="hidden" name="parent_id" id="parent_id" value="{{ values.get('parent_id', '') }}">
+
+  {% if can_search %}
+    <div class="edit-banner akhir-banner" id="akhir-pilih-banner"
+         {% if not values.get('parent_id') %}hidden{% endif %}>
+      <span>📋 <strong>Pengukuran Akhir</strong> untuk pasien
+        <strong id="akhir-pilih-nama">{{ values.get('nama', '') }}</strong>.
+        Data karakteristik disalin dari pengukuran awal — periksa lalu isi PSQI,
+        DASS-21, dan MoCA-Ina.</span>
+      <a href="#" class="link" id="akhir-pilih-batal">Batal pilihan</a>
+    </div>
+  {% endif %}
 
   {# Progress #}
   <div class="steps-bar">
     <div class="step-pill active" data-pill="0"><span>1</span> Data Pasien</div>
     <div class="step-pill" data-pill="1"><span>2</span> PSQI</div>
     <div class="step-pill" data-pill="2"><span>3</span> DASS-21</div>
+    <div class="step-pill" data-pill="3"><span>4</span> MoCA-Ina</div>
   </div>
 
   {% if errors %}
@@ -62,7 +87,19 @@
           {% if f.required %}<span class="req">*</span>{% endif %}
         </label>
 
-        {% if f.type in ['text', 'date', 'number', 'tel'] %}
+        {% if f.name == 'nama' and can_search %}
+          <div class="autocomplete" id="nama-autocomplete">
+            <input class="input" type="text" id="nama" name="nama"
+                   value="{{ values.get('nama', '') }}" data-required="1"
+                   autocomplete="off" role="combobox" aria-expanded="false"
+                   aria-autocomplete="list" aria-controls="nama-ac-list"
+                   placeholder="Ketik nama… (pilih dari daftar untuk pengukuran akhir)">
+            <div class="ac-list" id="nama-ac-list" role="listbox" hidden></div>
+          </div>
+          <p class="hint">Pilih pasien yang muncul untuk mengisi
+            <b>pengukuran akhir</b>, atau ketik nama baru untuk pasien baru.</p>
+
+        {% elif f.type in ['text', 'date', 'number', 'tel'] %}
           <input class="input" type="{{ f.type }}" id="{{ f.name }}"
                  name="{{ f.name }}" value="{{ values.get(f.name, '') }}"
                  {% if f.required %}data-required="1"{% endif %}
@@ -98,12 +135,11 @@
     {% for item in Q.PSQI_ISIAN %}
       <div class="field {% if item.name in errors %}has-error{% endif %}">
         <label class="field-label" for="{{ item.name }}">
-          {{ item.no }}. {{ item.label }} <span class="req">*</span>
+          {{ item.no }}. {{ item.label }}
         </label>
         <div class="inline-input">
           <input class="input input-sm" type="{{ item.type }}" id="{{ item.name }}"
                  name="{{ item.name }}" value="{{ values.get(item.name, '') }}"
-                 data-required="1"
                  {% if item.min is defined %}min="{{ item.min }}"{% endif %}
                  {% if item.max is defined %}max="{{ item.max }}"{% endif %}
                  {% if item.step is defined %}step="{{ item.step }}"{% endif %}>
@@ -115,12 +151,12 @@
     {# Pertanyaan 5 a-j #}
     <div class="field">
       <p class="field-label">5. Selama sebulan terakhir, seberapa sering Anda
-        mengalami kesulitan tidur karena hal berikut? <span class="req">*</span></p>
+        mengalami kesulitan tidur karena hal berikut?</p>
       <div class="matrix">
         {% for name, huruf, teks in Q.PSQI_Q5_ITEMS %}
           <div class="matrix-row {% if name in errors %}has-error{% endif %}">
             <div class="matrix-q">{{ huruf }}. {{ teks }}</div>
-            {{ radio_scale(name, Q.PSQI_SKALA_FREKUENSI, required=(huruf != 'j')) }}
+            {{ radio_scale(name, Q.PSQI_SKALA_FREKUENSI, required=False) }}
             {% if huruf == 'j' %}
               <input class="input input-other" type="text" name="{{ Q.PSQI_Q5J_OTHER }}"
                      placeholder="Sebutkan alasan lain (opsional)"
@@ -134,16 +170,16 @@
     {# Pertanyaan 6 & 7 #}
     {% for item in [Q.PSQI_Q6, Q.PSQI_Q7] %}
       <div class="field {% if item.name in errors %}has-error{% endif %}">
-        <p class="field-label">{{ item.no }}. {{ item.label }} <span class="req">*</span></p>
-        {{ radio_scale(item.name, Q.PSQI_SKALA_FREKUENSI) }}
+        <p class="field-label">{{ item.no }}. {{ item.label }}</p>
+        {{ radio_scale(item.name, Q.PSQI_SKALA_FREKUENSI, required=False) }}
       </div>
     {% endfor %}
 
     {# Pertanyaan 8 & 9 #}
     {% for item in [Q.PSQI_Q8, Q.PSQI_Q9] %}
       <div class="field {% if item.name in errors %}has-error{% endif %}">
-        <p class="field-label">{{ item.no }}. {{ item.label }} <span class="req">*</span></p>
-        {{ radio_scale(item.name, item.skala) }}
+        <p class="field-label">{{ item.no }}. {{ item.label }}</p>
+        {{ radio_scale(item.name, item.skala, required=False) }}
       </div>
     {% endfor %}
 
@@ -201,7 +237,7 @@
           <div class="matrix-q"><span class="qnum">{{ nomor }}.</span> {{ teks }}</div>
           {% for val, singkat, panjang in Q.DASS_SKALA %}
             <label class="dass-opt">
-              <input type="radio" name="{{ name }}" value="{{ val }}" data-required="1"
+              <input type="radio" name="{{ name }}" value="{{ val }}"
                      {% if values.get(name) == val|string %}checked{% endif %}>
               <span class="dass-dot">{{ val }}</span>
             </label>
@@ -212,8 +248,45 @@
 
     <div class="step-nav">
       <button type="button" class="btn btn-ghost" data-prev>← Kembali</button>
+      <button type="button" class="btn btn-primary" data-next>Lanjut ke MoCA-Ina →</button>
+    </div>
+  </fieldset>
+
+  {# ============ STEP 4: MoCA-Ina ============ #}
+  <fieldset class="form-step is-hidden" data-step="3">
+    <h2 class="step-title">Bagian 4 — MoCA-Ina (Fungsi Kognitif)</h2>
+    <p class="petunjuk">{{ Q.MOCA_PETUNJUK }}</p>
+
+    <div class="moca-grid">
+      {% for name, label, maks, deskripsi in Q.MOCA_DOMAINS %}
+        <div class="field moca-field">
+          <label class="field-label" for="{{ name }}">{{ loop.index }}. {{ label }}</label>
+          <p class="hint moca-desc">{{ deskripsi }}</p>
+          <div class="inline-input">
+            <input class="input input-xs" type="number" id="{{ name }}" name="{{ name }}"
+                   min="0" max="{{ maks }}" step="1"
+                   value="{{ values.get(name, '') }}" placeholder="0">
+            <span class="suffix">/ {{ maks }}</span>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+
+    <div class="field moca-edu">
+      <label class="opt">
+        <input type="checkbox" name="{{ Q.MOCA_EDU_FIELD }}" value="1"
+               {% if values.get(Q.MOCA_EDU_FIELD) in ['1', 'on', 'true'] %}checked{% endif %}>
+        <span>{{ Q.MOCA_EDU_LABEL }}</span>
+      </label>
+    </div>
+
+    <p class="muted small">Total maksimal {{ Q.MOCA_TOTAL_MAX }} • Nilai potong
+      ≥ {{ Q.MOCA_CUTOFF }} = normal. Total &amp; interpretasi dihitung otomatis.</p>
+
+    <div class="step-nav">
+      <button type="button" class="btn btn-ghost" data-prev>← Kembali</button>
       <button type="submit" class="btn btn-success btn-lg">
-        {% if edit_id %}Simpan Perubahan ✓{% else %}Kirim &amp; Lihat Hasil ✓{% endif %}
+        {% if edit_id %}Simpan Perubahan ✓{% elif fase == 'akhir' %}Simpan Pengukuran Akhir ✓{% else %}Kirim &amp; Lihat Hasil ✓{% endif %}
       </button>
     </div>
   </fieldset>

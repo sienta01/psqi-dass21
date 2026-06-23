@@ -1,56 +1,68 @@
 {% extends "base.html" %}
-{% block title %}Data Responden — {{ app_title }}{% endblock %}
+{% block title %}Data Pasien — {{ app_title }}{% endblock %}
 {% block content %}
 <div class="admin-head">
-  <h1>Data Responden</h1>
+  <h1>Data Pasien</h1>
   <div class="admin-actions">
-    <span class="badge">Total: {{ total }}</span>
+    <span class="badge">Total pasien: {{ total }}</span>
     <a class="btn btn-success" href="{{ url_for('admin_export') }}">⬇ Ekspor CSV</a>
   </div>
 </div>
 
-{% if rows %}
+{% if pasien %}
+<p class="muted small">Nilai ditampilkan sebagai <b>Awal → Akhir</b> bila pengukuran
+  akhir sudah ada. Satu baris = satu pasien.</p>
 <div class="table-wrap">
   <table class="table table-admin">
     <thead>
       <tr>
         <th>#</th>
-        <th>Tanggal</th>
+        <th>Tgl Awal</th>
         <th>Nama</th>
         <th>No. RM</th>
         <th>Usia</th>
         <th>JK</th>
         <th class="num">PSQI</th>
-        <th>Tidur</th>
         <th class="num">Depresi</th>
         <th class="num">Cemas</th>
         <th class="num">Stres</th>
+        <th class="num">MoCA</th>
+        <th>Akhir</th>
         <th></th>
       </tr>
     </thead>
     <tbody>
-      {% for r in rows %}
+      {% for p in pasien %}
+      {% set ada_akhir = p['akhir_id'] is not none %}
       <tr>
-        <td>{{ r['id'] }}</td>
-        <td>{{ r['tanggal'] or '-' }}</td>
-        <td>{{ r['nama'] or '-' }}</td>
-        <td>{{ r['no_rm'] or '-' }}</td>
-        <td>{{ r['usia'] or '-' }}</td>
-        <td>{{ (r['jenis_kelamin'] or '')[:1] }}</td>
-        <td class="num">{{ r['psqi_global'] }}</td>
+        <td>{{ p['id'] }}</td>
+        <td>{{ p['tanggal'] or '-' }}</td>
+        <td>{{ p['nama'] or '-' }}</td>
+        <td>{{ p['no_rm'] or '-' }}</td>
+        <td>{{ p['usia'] or '-' }}</td>
+        <td>{{ (p['jenis_kelamin'] or '')[:1] }}</td>
+        <td class="num">{{ p['psqi_global'] }}{% if ada_akhir %} <span class="arrow">→</span> {{ p['akhir_psqi_global'] }}{% endif %}</td>
+        <td class="num">{{ p['dass_depresi'] }}{% if ada_akhir %} <span class="arrow">→</span> {{ p['akhir_dass_depresi'] }}{% endif %}</td>
+        <td class="num">{{ p['dass_cemas'] }}{% if ada_akhir %} <span class="arrow">→</span> {{ p['akhir_dass_cemas'] }}{% endif %}</td>
+        <td class="num">{{ p['dass_stres'] }}{% if ada_akhir %} <span class="arrow">→</span> {{ p['akhir_dass_stres'] }}{% endif %}</td>
+        <td class="num">
+          {{ p['moca_total'] if p['moca_total'] is not none else '–' }}
+          {% if ada_akhir %} <span class="arrow">→</span> {{ p['akhir_moca_total'] if p['akhir_moca_total'] is not none else '–' }}{% endif %}
+        </td>
         <td>
-          {% if r['psqi_buruk'] %}
-            <span class="tag tag-bad">Buruk</span>
+          {% if ada_akhir %}
+            <span class="tag tag-good">Selesai</span>
           {% else %}
-            <span class="tag tag-good">Baik</span>
+            <span class="tag tag-pending">Belum</span>
           {% endif %}
         </td>
-        <td class="num">{{ r['dass_depresi'] }} <small>{{ r['dass_depresi_kat'] }}</small></td>
-        <td class="num">{{ r['dass_cemas'] }} <small>{{ r['dass_cemas_kat'] }}</small></td>
-        <td class="num">{{ r['dass_stres'] }} <small>{{ r['dass_stres_kat'] }}</small></td>
         <td class="actions-cell">
-          <a class="link" href="{{ url_for('admin_detail', resp_id=r['id']) }}">Detail</a>
-          <a class="link" href="{{ url_for('admin_edit', resp_id=r['id']) }}">Edit</a>
+          <a class="link" href="{{ url_for('admin_detail', resp_id=p['id']) }}">Detail</a>
+          {% if ada_akhir %}
+            <a class="link" href="{{ url_for('admin_banding', pasien_id=p['id']) }}">Banding</a>
+          {% else %}
+            <a class="link link-add" href="{{ url_for('admin_akhir', pasien_id=p['id']) }}">+ Akhir</a>
+          {% endif %}
         </td>
       </tr>
       {% endfor %}
