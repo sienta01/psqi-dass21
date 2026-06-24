@@ -13,7 +13,7 @@
     {% if data.get('cogstim_explained') in ['1','on','true','Ya'] %}
       <span class="tag tag-good">cogstim ✓</span>{% endif %}
     {% if not public and kontrol %}<span><b>Kontrol berikutnya:</b> {{ kontrol }}</span>{% endif %}
-    {% if not public %}<span><b>ID #{{ resp_id }}</b> • {{ created_at }}</span>{% endif %}
+    {% if not public %}<span><b>ID #{{ resp_id }}</b> • {{ created_at.replace('T', ' ') if created_at else '' }} WITA</span>{% endif %}
   </div>
 </div>
 
