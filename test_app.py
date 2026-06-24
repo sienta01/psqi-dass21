@@ -162,55 +162,59 @@ def main():
     r = client.post("/isi", data=awal)
     pid = int(r.headers["Location"].rstrip("/").split("/")[-1])
 
-    # Halaman tambah pengukuran akhir: demografi ter-prefill
+    # Halaman tambah pengukuran lanjutan: demografi ter-prefill
     r = client.get("/admin/pasien/%d/akhir" % pid)
     assert r.status_code == 200
-    assert b"Pengukuran Akhir" in r.data and b"Pasien Longitudinal" in r.data
+    assert b"Pengukuran Lanjutan" in r.data and b"Pasien Longitudinal" in r.data
     print("OK  GET /admin/pasien/<id>/akhir (demografi tersalin)")
 
-    # Simpan pengukuran akhir (membaik)
-    akhir = isi_lengkap()
-    akhir["nama"] = "Pasien Longitudinal"
-    akhir["psqi_q4_sleep_hours"] = "8"
-    for i in range(1, 22):
-        akhir["dass_q" + str(i)] = "0"
-    akhir["_csrf"] = token
-    r = client.post("/admin/pasien/%d/akhir" % pid, data=akhir)
-    assert r.status_code == 302 and ("/admin/banding/%d" % pid) in r.headers["Location"]
-    print("OK  POST pengukuran akhir -> redirect perbandingan")
+    def lanjutan(sleep):
+        d = isi_lengkap()
+        d["nama"] = "Pasien Longitudinal"
+        d["psqi_q4_sleep_hours"] = sleep
+        for i in range(1, 22):
+            d["dass_q" + str(i)] = "0"
+        d["_csrf"] = token
+        return d
 
-    # Halaman perbandingan menampilkan selisih
+    # Simpan pengukuran lanjutan ke-2 (membaik)
+    r = client.post("/admin/pasien/%d/akhir" % pid, data=lanjutan("8"))
+    assert r.status_code == 302 and ("/admin/banding/%d" % pid) in r.headers["Location"]
+    print("OK  POST pengukuran lanjutan -> redirect tren")
+
+    # Halaman tren menampilkan selisih
     r = client.get("/admin/banding/%d" % pid)
     body = r.data.decode()
-    assert "Perbandingan Awal vs Akhir" in body
-    assert "membaik" in body  # minimal satu perubahan membaik
-    print("OK  GET /admin/banding menampilkan selisih")
+    assert "Tren Pengukuran" in body and "membaik" in body
+    print("OK  GET /admin/banding menampilkan tren + selisih")
 
-    # Tidak boleh menambah akhir kedua
-    r = client.get("/admin/pasien/%d/akhir" % pid)
-    assert r.status_code == 302 and ("/admin/banding/%d" % pid) in r.headers["Location"]
-    print("OK  pengukuran akhir kedua ditolak")
+    # Boleh menambah pengukuran KETIGA (tidak ada lagi batas awal/akhir)
+    r = client.post("/admin/pasien/%d/akhir" % pid, data=lanjutan("7"))
+    assert r.status_code == 302
+    r = client.get("/admin/banding/%d" % pid)
+    assert b"Ke-3" in r.data  # ada kolom pengukuran ke-3
+    print("OK  pengukuran ke-3 diterima (multi-entry)")
 
-    # Daftar admin: pasien ini berstatus 'Selesai'
+    # Daftar admin: pasien ini menampilkan jumlah pengukuran (3x)
     r = client.get("/admin")
-    assert b"Selesai" in r.data
-    print("OK  daftar admin menandai pasien selesai")
+    assert b"3&#215;" in r.data or b"3\xc3\x97" in r.data or b">3" in r.data
+    print("OK  daftar admin menampilkan jumlah pengukuran")
 
-    # Ekspor: ada kolom Fase, dan dua baris (awal+akhir) berbagi ID Pasien
+    # Ekspor: kolom Fase, dan 3 baris berbagi ID Pasien
     r = client.get("/admin/export.csv")
     csv_text = r.data.decode("utf-8")
     assert "Fase" in csv_text and "ID Pasien (Awal)" in csv_text
     longis = [ln for ln in csv_text.splitlines() if "Pasien Longitudinal" in ln]
-    assert len(longis) == 2, "harus 2 baris (awal & akhir)"
-    print("OK  ekspor punya kolom Fase & pasangan awal+akhir")
+    assert len(longis) == 3, "harus 3 baris (awal + 2 lanjutan)"
+    print("OK  ekspor punya kolom Fase & semua pengukuran")
 
-    # Hapus pasien menghapus pengukuran akhir juga (cascade)
+    # Hapus pasien menghapus seluruh pengukuran lanjutan (cascade)
     r = client.post("/admin/hapus/%d" % pid, data={"_csrf": token})
     assert r.status_code == 302
     assert client.get("/admin/banding/%d" % pid).status_code == 404  # pasien hilang
     csv_text = client.get("/admin/export.csv").data.decode("utf-8")
-    assert "Pasien Longitudinal" not in csv_text  # awal & akhir ikut terhapus
-    print("OK  hapus pasien cascade ke pengukuran akhir")
+    assert "Pasien Longitudinal" not in csv_text  # semua ikut terhapus
+    print("OK  hapus pasien cascade ke semua pengukuran")
 
     # 13) Alur autolengkap nama -> pengukuran akhir (admin)
     # Budi (#1) adalah pengukuran awal tanpa akhir.
@@ -245,6 +249,40 @@ def main():
         "parent_id": "2"})
     assert r.status_code == 302 and "/hasil/" in r.headers["Location"], r.headers.get("Location")
     print("OK  non-admin: parent_id diabaikan (tetap pengukuran awal)")
+
+    # 14) Checklist cogstim + tanggal kontrol + pengingat Telegram (dry-run)
+    import db as _db
+    import reminder
+    from datetime import date as _date, timedelta as _td
+    client.get("/isi")
+    with client.session_transaction() as s:
+        token = s["_csrf"]
+    client.post("/admin/login", data={"_csrf": token, "password": "rahasia123"})
+    besok = (_date.today() + _td(days=1)).isoformat()
+    with client.session_transaction() as s:
+        token = s["_csrf"]
+    r = client.post("/isi", data={
+        "_csrf": token, "tanggal": _date.today().isoformat(),
+        "nama": "Pasien Kontrol", "no_rm": "RMK9",
+        "cogstim_explained": "1", "kontrol_berikutnya": besok})
+    assert r.status_code == 302
+    assert b"cogstim" in client.get(r.headers["Location"]).data
+    print("OK  checklist cogstim tersimpan & tampil di hasil")
+
+    due = _db.pasien_kontrol_pada(besok)
+    assert any(x["nama"] == "Pasien Kontrol" for x in due), [x["nama"] for x in due]
+    # tanggal lain tidak memicu
+    assert not any(x["nama"] == "Pasien Kontrol"
+                   for x in _db.pasien_kontrol_pada("1999-01-01"))
+    print("OK  db.pasien_kontrol_pada menemukan kontrol H-1")
+
+    n = reminder.jalankan(besok, dry_run=True)
+    assert n >= 1
+    print("OK  reminder.py (dry-run) menyiapkan %d pengingat" % n)
+
+    csv_text = client.get("/admin/export.csv").data.decode("utf-8")
+    assert "cogstim" in csv_text.lower() and "Kontrol" in csv_text
+    print("OK  ekspor punya kolom cogstim & tanggal kontrol")
 
     print("\nSemua smoke test lulus.")
 

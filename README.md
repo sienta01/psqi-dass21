@@ -15,10 +15,16 @@ Indonesia.
   - PSQI: 7 komponen + skor global (0–21). Skor > 5 = kualitas tidur buruk.
   - DASS-21: subskala Depresi, Cemas, Stres (skor ×2) + kategori (Normal s/d Sangat Berat).
   - MoCA-Ina: rincian 7 domain kognitif + total (0–30) + interpretasi. Skor ≥ 26 = normal.
-- **Desain longitudinal (2 kali ukur)** — tiap pasien diukur **Awal** (baseline)
-  dan **Akhir**. Pengukuran akhir ditambah dari admin dengan memilih pasien dari
-  daftar; data karakteristik tersalin otomatis dari baseline. Tersedia **halaman
-  perbandingan Awal vs Akhir** lengkap dengan selisih (perubahan) tiap skor.
+- **Checklist edukasi cogstim** (cognitive stimulation) pada data pasien.
+- **Desain longitudinal (banyak kali ukur)** — tiap pasien bisa diukur
+  **berkali-kali** (Awal lalu sejumlah pengukuran lanjutan). Pengukuran lanjutan
+  ditambah dari admin dengan memilih pasien dari daftar (kolom nama berfungsi
+  sebagai pencarian); data karakteristik tersalin otomatis dari baseline.
+  Tersedia **halaman tren** yang menampilkan semua pengukuran berdampingan +
+  selisih awal vs terakhir tiap skor.
+- **Pengingat H-1 via Telegram** — bot Telegram mengirim pesan ke nomor Anda
+  bila ada pasien yang dijadwalkan kontrol/rawat jalan besok (lihat
+  [Pengingat Telegram](#pengingat-kontrol-via-telegram)).
 - **Validasi isian** di sisi browser dan server.
 - **Halaman hasil** dengan rincian skor dan interpretasi (bisa dicetak/PDF).
 - **Halaman admin** (dengan password) untuk melihat seluruh data dan **ekspor CSV**.
@@ -35,7 +41,8 @@ psqi-dass21/
 ├── questions.py            # Seluruh pertanyaan & pilihan (Bahasa Indonesia)
 ├── db.py                   # Penyimpanan SQLite
 ├── export.py               # Ekspor data ke CSV
-├── config.py               # Konfigurasi (password admin, secret key, dll)
+├── config.py               # Konfigurasi (password admin, secret key, Telegram)
+├── reminder.py             # Skrip pengingat kontrol H-1 via Telegram
 ├── requirements.txt        # Daftar dependensi (Flask)
 ├── wsgi_pythonanywhere.py  # Contoh file WSGI untuk PythonAnywhere
 ├── templates/              # Halaman HTML
@@ -152,29 +159,78 @@ Karena aplikasi menyimpan data pasien (termasuk identitas), lakukan hal berikut:
   lain (termasuk MoCA-Ina) boleh dikosongkan.
 - **Untuk peneliti (admin)**: klik **Admin** → masuk dengan password →
   lihat tabel **Data Pasien** (satu baris per pasien) → **Ekspor CSV** untuk analisis.
-  Pada tiap baris tersedia **Detail**, **Edit** (skor dihitung ulang otomatis,
-  data tidak diduplikasi), dan tombol **+ Akhir** / **Banding**.
-  Menghapus pasien (dari halaman Detail) ikut menghapus pengukuran akhirnya.
+  Pada tiap baris tersedia **Detail**, **+ Ukur** (tambah pengukuran), dan jumlah
+  pengukuran (klik untuk melihat **tren**). Di halaman Detail ada juga **Edit**.
+  Menghapus pasien (dari halaman Detail) ikut menghapus semua pengukurannya.
 
-### Alur pengukuran Awal & Akhir (longitudinal)
+### Alur pengukuran longitudinal (banyak kali ukur)
 
 1. **Pengukuran awal (baseline)** diisi lewat halaman `/isi` seperti biasa →
    otomatis tercatat sebagai fase **Awal** dan membuat satu "pasien".
-2. **Pengukuran akhir** — saat login sebagai **admin**, buka `/isi` lalu mulai
-   mengetik nama di kolom **Nama Responden**. Pasien yang cocok akan muncul
-   sebagai daftar; **pilih** salah satu (klik, atau navigasi dengan tombol
-   **↑/↓** lalu **Enter**) → formulir berubah ke mode *Pengukuran Akhir*, data
-   karakteristik **tersalin otomatis** dari baseline, dan Anda tinggal mengisi
-   PSQI, DASS-21, dan MoCA-Ina. Menekan **Enter** saat tidak ada pasien yang
-   cocok akan **lanjut sebagai pasien baru**. Alternatif: tombol **+ Akhir**
-   pada tabel admin.
+2. **Pengukuran lanjutan** (boleh berkali-kali) — saat login sebagai **admin**,
+   buka `/isi` lalu mulai mengetik nama di kolom **Nama Responden**. Pasien yang
+   cocok muncul sebagai daftar; **pilih** salah satu (klik, atau **↑/↓** lalu
+   **Enter**) → formulir jadi mode *Pengukuran Lanjutan*, data karakteristik
+   **tersalin otomatis** dari baseline, tinggal mengisi PSQI, DASS-21, MoCA-Ina,
+   dan (bila perlu) tanggal kontrol berikutnya. **Enter** saat tidak ada yang
+   cocok = lanjut sebagai pasien baru. Alternatif: tombol **+ Ukur** pada tabel
+   admin. Tidak ada batas jumlah pengukuran per pasien.
    > Catatan privasi: pencarian nama hanya muncul untuk admin yang login.
    > Pengunjung biasa di `/isi` hanya melihat kolom nama biasa.
-3. Setelah tersimpan, buka **Banding** untuk melihat **perbandingan Awal vs
-   Akhir** beserta selisih tiap skor (ditandai *membaik* / *memburuk*).
-4. **Ekspor CSV** berisi kolom **Fase** (Awal/Akhir) dan **ID Pasien (Awal)**
-   sehingga pasangan pengukuran tiap pasien mudah dianalisis (mis. uji
-   berpasangan di SPSS).
+3. Buka **tren** (klik angka pengukuran, atau tombol *Lihat Tren*) untuk melihat
+   **semua pengukuran berdampingan** + selisih awal vs terakhir (*membaik* /
+   *memburuk*).
+4. **Ekspor CSV** berisi kolom **Fase** (Awal/Lanjutan) dan **ID Pasien (Awal)**
+   sehingga semua pengukuran tiap pasien mudah dianalisis (mis. uji berpasangan
+   atau repeated measures di SPSS).
+
+---
+
+## Pengingat Kontrol via Telegram
+
+Skrip [`reminder.py`](reminder.py) mengirim pesan **ke Telegram Anda** (bukan ke
+pasien) untuk setiap pasien yang pengukuran terbarunya mencatat **Tanggal Kontrol
+Berikutnya = besok** (pengingat H-1). Pesan berisi **Nama**, **No. RM**, dan
+**tanggal kontrol**.
+
+### 1. Buat bot Telegram & ambil token
+1. Di Telegram, buka **@BotFather** → kirim `/newbot` → ikuti instruksi (beri nama
+   & username bot).
+2. BotFather memberi **token** seperti `123456789:ABCdef...`. Simpan.
+
+### 2. Ambil chat ID Anda
+1. **Kirim pesan apa saja** ke bot Anda dulu (cari username bot, lalu chat → kirim "halo").
+2. Buka di browser: `https://api.telegram.org/bot<TOKEN>/getUpdates`
+   (ganti `<TOKEN>`). Cari `"chat":{"id":<angka>...}` — angka itu **chat ID** Anda.
+   (Alternatif: kirim pesan ke **@userinfobot** untuk melihat ID Anda.)
+
+### 3. Set environment variable
+Di file WSGI PythonAnywhere (atau environment), tambahkan:
+```python
+os.environ.setdefault("TELEGRAM_BOT_TOKEN", "123456789:ABCdef...")
+os.environ.setdefault("TELEGRAM_CHAT_ID", "123456789")
+```
+Untuk uji lokal, set dulu lalu jalankan:
+```bash
+python reminder.py --test      # kirim 1 pesan uji
+python reminder.py --dry-run   # tampilkan pengingat besok tanpa mengirim
+```
+
+### 4. Jadwalkan harian di PythonAnywhere
+1. Buka tab **Tasks** (Scheduled tasks).
+2. Tambah task harian (pilih jamnya, mis. 08:00) dengan perintah:
+   ```bash
+   python3 /home/USERNAME/psqi-dass21/reminder.py
+   ```
+   Ganti `USERNAME` dan path bila perlu. Karena env var dari file WSGI tidak
+   terbaca oleh scheduled task, **set token & chat ID langsung di perintah**:
+   ```bash
+   TELEGRAM_BOT_TOKEN='123...:ABC...' TELEGRAM_CHAT_ID='123456789' python3 /home/USERNAME/psqi-dass21/reminder.py
+   ```
+3. Task akan berjalan tiap hari dan mengirim pengingat untuk kontrol esok hari.
+
+> Akun gratis PythonAnywhere memberi **satu** scheduled task harian — cukup untuk
+> pengingat ini.
 
 ---
 
@@ -230,3 +286,6 @@ dicatat sebagai "tidak dinilai". Nilai potong & penyesuaian dapat diubah di
 - **Mengubah tampilan**: edit `static/style.css`.
 - **Mengubah judul aplikasi**: atur `APP_TITLE` / `APP_SUBTITLE` di file WSGI
   atau `config.py`.
+- **Zona waktu**: server PythonAnywhere memakai UTC, tetapi aplikasi memakai
+  **UTC+8** (tanggal & waktu input). Untuk zona lain (mis. WIB/UTC+7), ubah
+  `ZONA` di `waktu.py`.

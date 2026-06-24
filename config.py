@@ -23,5 +23,9 @@ class Config:
     # Nama institusi / judul yang tampil di header (opsional).
     APP_TITLE = os.environ.get("APP_TITLE", "Form Pengambilan Data Pasien")
     APP_SUBTITLE = os.environ.get(
-        "APP_SUBTITLE", "Karakteristik Pasien • PSQI • DASS-21"
+        "APP_SUBTITLE", "Karakteristik Pasien • PSQI • DASS-21 • MoCA-Ina"
     )
+
+    # Pengingat Telegram (lihat reminder.py & README). Isi via environment var.
+    TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+    TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")

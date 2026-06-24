@@ -49,7 +49,18 @@ PASIEN_FIELDS = [
      "other_label": "Sebutkan tindakan"},
     {"name": "stroke_berulang", "label": "Riwayat Stroke Berulang", "type": "radio",
      "required": False, "options": ["Ya", "Tidak"]},
+    {"name": "cogstim_explained", "label": "Edukasi Cognitive Stimulation (cogstim)",
+     "type": "checkbox", "required": False,
+     "checkbox_text": "Sudah dijelaskan kepada pasien/keluarga"},
+    {"name": "kontrol_berikutnya",
+     "label": "Tanggal Kontrol / Rawat Jalan Berikutnya",
+     "type": "date", "required": False,
+     "hint": "Dipakai untuk pengingat H-1 via Telegram."},
 ]
+
+# Field demografi yang TIDAK disalin saat menambah pengukuran lanjutan
+# (diisi ulang tiap kunjungan).
+FIELDS_TIDAK_DISALIN = {"tanggal", "kontrol_berikutnya"}
 
 
 # ---------------------------------------------------------------------------

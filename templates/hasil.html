@@ -10,6 +10,9 @@
     <span><b>Nama:</b> {{ data.get('nama', '-') }}</span>
     <span><b>No. RM:</b> {{ data.get('no_rm') or '-' }}</span>
     <span><b>Tanggal:</b> {{ data.get('tanggal') or '-' }}</span>
+    {% if data.get('cogstim_explained') in ['1','on','true','Ya'] %}
+      <span class="tag tag-good">cogstim ✓</span>{% endif %}
+    {% if not public and kontrol %}<span><b>Kontrol berikutnya:</b> {{ kontrol }}</span>{% endif %}
     {% if not public %}<span><b>ID #{{ resp_id }}</b> • {{ created_at }}</span>{% endif %}
   </div>
 </div>
@@ -126,10 +129,10 @@
     <a class="btn btn-ghost" href="{{ url_for('admin') }}">← Kembali ke Data</a>
     <a class="btn btn-primary" href="{{ url_for('admin_edit', resp_id=resp_id) }}">✎ Edit Data</a>
     {% if bisa_tambah_akhir %}
-      <a class="btn btn-success" href="{{ url_for('admin_akhir', pasien_id=pasien_id) }}">+ Pengukuran Akhir</a>
+      <a class="btn btn-success" href="{{ url_for('admin_akhir', pasien_id=pasien_id) }}">+ Pengukuran</a>
     {% endif %}
     {% if banding_ada %}
-      <a class="btn btn-success" href="{{ url_for('admin_banding', pasien_id=pasien_id) }}">⇄ Bandingkan Awal vs Akhir</a>
+      <a class="btn btn-success" href="{{ url_for('admin_banding', pasien_id=pasien_id) }}">⇄ Lihat Tren / Perbandingan</a>
     {% endif %}
     <button class="btn btn-ghost" onclick="window.print()">Cetak / PDF</button>
     <form method="POST" action="{{ url_for('admin_hapus', resp_id=resp_id) }}"

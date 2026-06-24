@@ -290,6 +290,19 @@ main.container { padding: 1.6rem 0 1rem; }
 .table-wrap { overflow-x: auto; background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow); }
 .table-admin { min-width: 760px; }
 .table-admin small { display: block; color: var(--muted); font-weight: 400; font-size: .75rem; }
+
+/* Bekukan kolom Nama agar tetap terlihat saat menggeser tabel ke samping. */
+.table-admin .col-nama {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--white);
+  box-shadow: 1px 0 0 var(--line);
+}
+.table-admin thead .col-nama {
+  z-index: 3;
+  background: #f1f4f8;
+}
 .tag { padding: .15rem .5rem; border-radius: 20px; font-size: .78rem; font-weight: 700; }
 .tag-good { background: #e7f6ee; color: var(--green); }
 .tag-bad { background: #fdecea; color: var(--red); }

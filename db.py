@@ -7,8 +7,8 @@ Satu tabel `responses`:
 """
 import json
 import sqlite3
-from datetime import datetime
 
+import waktu
 from config import Config
 
 SCHEMA = """
@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS responses (
     moca_total      INTEGER,
     fase            TEXT NOT NULL DEFAULT 'awal',
     parent_id       INTEGER,
+    kontrol_berikutnya TEXT,
     data_json       TEXT NOT NULL,
     skor_json       TEXT NOT NULL
 );
@@ -41,6 +42,7 @@ MIGRATIONS = [
     ("moca_total", "INTEGER"),
     ("fase", "TEXT NOT NULL DEFAULT 'awal'"),
     ("parent_id", "INTEGER"),
+    ("kontrol_berikutnya", "TEXT"),
 ]
 
 
@@ -67,7 +69,7 @@ def simpan_response(data: dict, skor: dict, fase: str = "awal",
     dass = skor.get("dass21", {})
     moca = skor.get("moca", {})
     row = (
-        datetime.now().isoformat(timespec="seconds"),
+        waktu.stempel_waktu(),
         data.get("tanggal"),
         data.get("nama"),
         data.get("no_rm"),
@@ -84,6 +86,7 @@ def simpan_response(data: dict, skor: dict, fase: str = "awal",
         moca.get("total") if moca.get("dinilai") else None,
         fase,
         parent_id,
+        data.get("kontrol_berikutnya") or None,
         json.dumps(data, ensure_ascii=False),
         json.dumps(skor, ensure_ascii=False),
     )
@@ -93,8 +96,9 @@ def simpan_response(data: dict, skor: dict, fase: str = "awal",
                (created_at, tanggal, nama, no_rm, usia, jenis_kelamin,
                 psqi_global, psqi_buruk, dass_depresi, dass_cemas, dass_stres,
                 dass_depresi_kat, dass_cemas_kat, dass_stres_kat,
-                moca_total, fase, parent_id, data_json, skor_json)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                moca_total, fase, parent_id, kontrol_berikutnya,
+                data_json, skor_json)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             row,
         )
         return cur.lastrowid
@@ -114,7 +118,8 @@ def update_response(resp_id: int, data: dict, skor: dict):
                tanggal=?, nama=?, no_rm=?, usia=?, jenis_kelamin=?,
                psqi_global=?, psqi_buruk=?, dass_depresi=?, dass_cemas=?,
                dass_stres=?, dass_depresi_kat=?, dass_cemas_kat=?,
-               dass_stres_kat=?, moca_total=?, data_json=?, skor_json=?
+               dass_stres_kat=?, moca_total=?, kontrol_berikutnya=?,
+               data_json=?, skor_json=?
                WHERE id=?""",
             (
                 data.get("tanggal"), data.get("nama"), data.get("no_rm"),
@@ -127,6 +132,7 @@ def update_response(resp_id: int, data: dict, skor: dict):
                 dass.get("cemas", {}).get("kategori"),
                 dass.get("stres", {}).get("kategori"),
                 moca.get("total") if moca.get("dinilai") else None,
+                data.get("kontrol_berikutnya") or None,
                 json.dumps(data, ensure_ascii=False),
                 json.dumps(skor, ensure_ascii=False),
                 resp_id,
@@ -166,63 +172,71 @@ def hitung_total() -> int:
 # Query untuk desain longitudinal (pengukuran awal & akhir)
 # ---------------------------------------------------------------------------
 def ambil_pasien_list():
-    """Satu baris per pasien (pengukuran awal), beserta ringkasan pengukuran
-    akhir bila ada (LEFT JOIN)."""
+    """Satu baris per pasien (pengukuran awal) + jumlah pengukuran lanjutan."""
     with get_conn() as conn:
         return conn.execute(
             """SELECT a.*,
-                      b.id          AS akhir_id,
-                      b.tanggal     AS akhir_tanggal,
-                      b.psqi_global AS akhir_psqi_global,
-                      b.psqi_buruk  AS akhir_psqi_buruk,
-                      b.dass_depresi AS akhir_dass_depresi,
-                      b.dass_cemas  AS akhir_dass_cemas,
-                      b.dass_stres  AS akhir_dass_stres,
-                      b.moca_total  AS akhir_moca_total
+                      (SELECT COUNT(*) FROM responses b
+                       WHERE b.parent_id = a.id) AS n_lanjutan
                FROM responses a
-               LEFT JOIN responses b
-                      ON b.parent_id = a.id AND b.fase = 'akhir'
                WHERE a.fase = 'awal'
                ORDER BY a.id DESC""",
         ).fetchall()
 
 
-def ambil_awal_tanpa_akhir():
-    """Pengukuran awal yang BELUM punya pengukuran akhir (untuk pilihan)."""
+def ambil_pengukuran_pasien(pasien_id: int):
+    """Seluruh pengukuran satu pasien (awal + semua lanjutan), urut kronologis."""
     with get_conn() as conn:
         return conn.execute(
-            """SELECT a.* FROM responses a
-               WHERE a.fase = 'awal'
-                 AND NOT EXISTS (
-                     SELECT 1 FROM responses b
-                     WHERE b.parent_id = a.id AND b.fase = 'akhir')
-               ORDER BY a.id DESC""",
+            """SELECT * FROM responses
+               WHERE id = ? OR parent_id = ?
+               ORDER BY created_at ASC""",
+            (pasien_id, pasien_id),
         ).fetchall()
 
 
-def ambil_akhir(parent_id: int):
-    """Pengukuran akhir untuk satu pasien (atau None)."""
+def jumlah_pengukuran(pasien_id: int) -> int:
+    """Total pengukuran untuk satu pasien (awal + lanjutan)."""
     with get_conn() as conn:
         return conn.execute(
-            "SELECT * FROM responses WHERE parent_id = ? AND fase = 'akhir'",
-            (parent_id,),
-        ).fetchone()
+            "SELECT COUNT(*) AS n FROM responses WHERE id = ? OR parent_id = ?",
+            (pasien_id, pasien_id),
+        ).fetchone()["n"]
 
 
 def cari_pasien(q: str, limit: int = 10):
-    """Cari pengukuran AWAL yang BELUM punya akhir, berdasarkan nama / No. RM.
-    Untuk fitur autolengkap saat menambah pengukuran akhir lewat form."""
+    """Cari pasien (pengukuran awal) berdasarkan nama / No. RM, untuk
+    autolengkap saat menambah pengukuran lanjutan. Pasien tetap muncul walau
+    sudah punya pengukuran lanjutan (boleh banyak pengukuran)."""
     like = "%" + q + "%"
     with get_conn() as conn:
         return conn.execute(
-            """SELECT a.id, a.nama, a.no_rm, a.tanggal, a.usia
+            """SELECT a.id, a.nama, a.no_rm, a.tanggal, a.usia,
+                      (SELECT COUNT(*) FROM responses b
+                       WHERE b.parent_id = a.id) AS n_lanjutan
                FROM responses a
                WHERE a.fase = 'awal'
                  AND (a.nama LIKE ? OR IFNULL(a.no_rm,'') LIKE ?)
-                 AND NOT EXISTS (
-                     SELECT 1 FROM responses b
-                     WHERE b.parent_id = a.id AND b.fase = 'akhir')
                ORDER BY a.nama
                LIMIT ?""",
             (like, like, limit),
         ).fetchall()
+
+
+def pasien_kontrol_pada(tanggal: str):
+    """Untuk pengingat: pasien yang pengukuran TERAKHIR-nya mencatat tanggal
+    kontrol berikutnya = `tanggal` (format 'YYYY-MM-DD').
+
+    Memakai entri terbaru tiap pasien agar tanggal kontrol lama tidak memicu
+    pengingat basi. Mengembalikan baris pengukuran terakhir tersebut."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            """SELECT *, COALESCE(parent_id, id) AS root
+               FROM responses ORDER BY created_at ASC""",
+        ).fetchall()
+    # Ambil entri terbaru per pasien (root).
+    terbaru = {}
+    for r in rows:
+        terbaru[r["root"]] = r        # iterasi menaik -> terakhir menang
+    return [r for r in terbaru.values()
+            if (r["kontrol_berikutnya"] or "") == tanggal]

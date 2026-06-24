@@ -300,9 +300,14 @@
       var radios = form.querySelectorAll('input[type="radio"][name="' + name + '"]');
       if (radios.length) {
         radios.forEach(function (r) { r.checked = (r.value === val); });
+        return;
+      }
+      var f = form.querySelector('[name="' + name + '"]');
+      if (!f) return;
+      if (f.type === "checkbox") {
+        f.checked = ["1", "on", "true", "Ya"].indexOf(String(val)) !== -1;
       } else {
-        var f = form.querySelector('[name="' + name + '"]');
-        if (f) f.value = val || "";
+        f.value = val || "";
       }
     });
     // Sinkronkan kotak "lainnya" (mis. keterangan intervensi).
@@ -330,10 +335,11 @@
     }
     var tgl = form.querySelector('[name="tanggal"]');
     if (tgl) {
-      var d = new Date();
-      tgl.value = d.getFullYear() + "-" +
-        String(d.getMonth() + 1).padStart(2, "0") + "-" +
-        String(d.getDate()).padStart(2, "0");
+      // Tanggal hari ini di UTC+8 (lepas dari zona waktu browser).
+      var d = new Date(Date.now() + 8 * 3600 * 1000);
+      tgl.value = d.getUTCFullYear() + "-" +
+        String(d.getUTCMonth() + 1).padStart(2, "0") + "-" +
+        String(d.getUTCDate()).padStart(2, "0");
     }
     form.querySelectorAll("[data-show-when]").forEach(function (box) {
       box.style.display = "none";

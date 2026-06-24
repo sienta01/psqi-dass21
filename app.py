@@ -4,8 +4,9 @@ Dirancang untuk di-hosting di PythonAnywhere (lihat README.md).
 Created on 22/06/2026 by Timothy Subroto
 """
 import secrets
-from datetime import date
 from functools import wraps
+
+import waktu
 
 from flask import (
     Flask, render_template, request, redirect, url_for, session,
@@ -73,8 +74,10 @@ def _demographic_fields():
 
 
 DEMOGRAPHIC_FIELDS = _demographic_fields()
+# Field demografi yang disalin ke pengukuran lanjutan (kecuali per-kunjungan).
+COPYABLE_FIELDS = [f for f in DEMOGRAPHIC_FIELDS if f not in Q.FIELDS_TIDAK_DISALIN]
 
-FASE_LABEL = {"awal": "Pengukuran Awal", "akhir": "Pengukuran Akhir"}
+FASE_LABEL = {"awal": "Pengukuran Awal", "akhir": "Pengukuran Lanjutan"}
 
 
 def _row_fase(row):
@@ -136,15 +139,14 @@ def _collect_and_validate():
 
 
 def _resolve_parent(is_admin):
-    """Validasi field tersembunyi `parent_id` untuk penautan pengukuran akhir.
-
-    Hanya admin yang boleh menautkan; parent harus pengukuran AWAL yang valid
-    dan belum punya akhir. Kembalikan (fase, parent_id, raw_value)."""
+    """Validasi field tersembunyi `parent_id` untuk menautkan pengukuran
+    lanjutan. Hanya admin yang boleh menautkan; parent harus pengukuran AWAL
+    yang valid. Satu pasien boleh punya banyak pengukuran lanjutan.
+    Kembalikan (fase, parent_id, raw_value)."""
     raw = (request.form.get("parent_id") or "").strip()
     if is_admin and raw.isdigit():
         awal = db.ambil_satu(int(raw))
-        if (awal is not None and _row_fase(awal) == "awal"
-                and db.ambil_akhir(int(raw)) is None):
+        if awal is not None and _row_fase(awal) == "awal":
             return "akhir", int(raw), raw
     return "awal", None, raw
 
@@ -166,7 +168,7 @@ def isi():
             resp_id = db.simpan_response(values, skor, fase=fase,
                                          parent_id=parent_id)
             if fase == "akhir":
-                flash("Pengukuran akhir tersimpan.", "ok")
+                flash("Pengukuran lanjutan tersimpan.", "ok")
                 return redirect(url_for("admin_banding", pasien_id=parent_id))
             return redirect(url_for("hasil", resp_id=resp_id))
 
@@ -175,7 +177,7 @@ def isi():
         flash("Masih ada pertanyaan wajib yang belum diisi. "
               "Bagian yang belum lengkap ditandai.", "error")
     else:
-        values["tanggal"] = date.today().isoformat()
+        values["tanggal"] = waktu.hari_ini().isoformat()
 
     return render_template(
         "form.html", Q=Q, values=values, errors=set(errors),
@@ -186,7 +188,7 @@ def isi():
 @app.route("/admin/cari-pasien")
 @login_required
 def admin_cari_pasien():
-    """Autolengkap: cari pasien (pengukuran awal tanpa akhir) untuk ditautkan."""
+    """Autolengkap: cari pasien (pengukuran awal) untuk pengukuran lanjutan."""
     q = (request.args.get("q") or "").strip()
     if len(q) < 2:
         return jsonify([])
@@ -207,7 +209,7 @@ def admin_pasien_data(pasien_id):
         abort(404)
     import json
     data = json.loads(row["data_json"])
-    demografi = {k: data.get(k, "") for k in DEMOGRAPHIC_FIELDS}
+    demografi = {k: data.get(k, "") for k in COPYABLE_FIELDS}
     return jsonify({"nama": row["nama"], "demografi": demografi})
 
 
@@ -271,11 +273,11 @@ def admin_detail(resp_id):
     skor = json.loads(row["skor_json"])
     fase = _row_fase(row)
 
-    # Konteks longitudinal: id pasien (pengukuran awal) & ketersediaan banding.
+    # Konteks longitudinal: id pasien (pengukuran awal) & jumlah pengukuran.
     pid = resp_id if fase == "awal" else row["parent_id"]
-    akhir = db.ambil_akhir(pid) if pid else None
-    banding_ada = pid is not None and akhir is not None
-    bisa_tambah_akhir = fase == "awal" and akhir is None
+    n_pengukuran = db.jumlah_pengukuran(pid) if pid else 1
+    banding_ada = n_pengukuran > 1
+    bisa_tambah_akhir = pid is not None  # boleh menambah pengukuran kapan saja
 
     return render_template(
         "hasil.html", data=data, skor=skor, resp_id=resp_id,
@@ -284,6 +286,7 @@ def admin_detail(resp_id):
         dass_tabel=Q.DASS_TABEL_INTERPRETASI, public=False,
         created_at=row["created_at"],
         fase=fase, fase_label=FASE_LABEL.get(fase, ""),
+        kontrol=row["kontrol_berikutnya"],
         pasien_id=pid, banding_ada=banding_ada,
         bisa_tambah_akhir=bisa_tambah_akhir,
     )
@@ -324,13 +327,10 @@ def admin_edit(resp_id):
 @app.route("/admin/pasien/<int:pasien_id>/akhir", methods=["GET", "POST"])
 @login_required
 def admin_akhir(pasien_id):
-    """Tambah pengukuran AKHIR untuk pasien (pengukuran awal) tertentu."""
+    """Tambah pengukuran LANJUTAN untuk pasien tertentu (boleh berkali-kali)."""
     awal = db.ambil_satu(pasien_id)
     if awal is None or _row_fase(awal) != "awal":
         abort(404)
-    if db.ambil_akhir(pasien_id) is not None:
-        flash("Pasien ini sudah memiliki pengukuran akhir.", "error")
-        return redirect(url_for("admin_banding", pasien_id=pasien_id))
 
     import json
     errors = []
@@ -341,44 +341,50 @@ def admin_akhir(pasien_id):
         if not errors:
             skor = hitung_semua(values)
             db.simpan_response(values, skor, fase="akhir", parent_id=pasien_id)
-            flash("Pengukuran akhir berhasil disimpan.", "ok")
+            flash("Pengukuran lanjutan berhasil disimpan.", "ok")
             return redirect(url_for("admin_banding", pasien_id=pasien_id))
         flash("Masih ada pertanyaan wajib yang belum diisi. "
               "Bagian yang belum lengkap ditandai.", "error")
     else:
-        # Salin demografi dari pengukuran awal; tanggal default = hari ini.
+        # Salin demografi (tanpa tanggal & jadwal kontrol) dari awal.
         awal_data = json.loads(awal["data_json"])
-        values = {k: awal_data.get(k, "") for k in DEMOGRAPHIC_FIELDS}
-        values["tanggal"] = date.today().isoformat()
+        values = {k: awal_data.get(k, "") for k in COPYABLE_FIELDS}
+        values["tanggal"] = waktu.hari_ini().isoformat()
 
+    ke = db.jumlah_pengukuran(pasien_id) + 1
     return render_template(
         "form.html", Q=Q, values=values, errors=set(errors),
         form_action=url_for("admin_akhir", pasien_id=pasien_id),
         fase="akhir", fase_label=FASE_LABEL["akhir"],
-        akhir_nama=awal["nama"], akhir_pasien_id=pasien_id,
+        akhir_nama=awal["nama"], akhir_pasien_id=pasien_id, akhir_ke=ke,
     )
 
 
 @app.route("/admin/banding/<int:pasien_id>")
 @login_required
 def admin_banding(pasien_id):
-    """Halaman perbandingan Awal vs Akhir untuk satu pasien."""
+    """Halaman tren: semua pengukuran satu pasien + selisih awal vs terakhir."""
     awal = db.ambil_satu(pasien_id)
     if awal is None or _row_fase(awal) != "awal":
         abort(404)
-    akhir = db.ambil_akhir(pasien_id)
-    if akhir is None:
-        flash("Pasien ini belum memiliki pengukuran akhir.", "error")
+    rows = db.ambil_pengukuran_pasien(pasien_id)
+    if len(rows) < 2:
+        flash("Pasien ini belum memiliki pengukuran lanjutan.", "error")
         return redirect(url_for("admin_detail", resp_id=pasien_id))
 
     import json
     data = json.loads(awal["data_json"])
-    skor_awal = json.loads(awal["skor_json"])
-    skor_akhir = json.loads(akhir["skor_json"])
-    perbandingan = bandingkan(skor_awal, skor_akhir)
+    pengukuran = []
+    for i, r in enumerate(rows, 1):
+        pengukuran.append({
+            "no": i, "id": r["id"], "tanggal": r["tanggal"],
+            "fase": _row_fase(r), "skor": json.loads(r["skor_json"]),
+        })
+    # Selisih pengukuran pertama vs terakhir.
+    perbandingan = bandingkan(pengukuran[0]["skor"], pengukuran[-1]["skor"])
     return render_template(
-        "banding.html", data=data, perbandingan=perbandingan,
-        awal=awal, akhir=akhir, pasien_id=pasien_id,
+        "banding.html", data=data, pengukuran=pengukuran,
+        perbandingan=perbandingan, pasien_id=pasien_id,
         psqi_label=PSQI_KOMPONEN_LABEL, dass_label=DASS_SUBSKALA_LABEL,
         moca_label=MOCA_DOMAIN_LABEL,
     )
@@ -399,7 +405,7 @@ def admin_hapus(resp_id):
 def admin_export():
     rows = db.ambil_semua(order_desc=False)
     csv_bytes = export.export_csv(rows)
-    today = date.today().isoformat()
+    today = waktu.hari_ini().isoformat()
     return Response(
         csv_bytes,
         mimetype="text/csv",

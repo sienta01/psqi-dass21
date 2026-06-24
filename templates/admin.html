@@ -10,15 +10,15 @@
 </div>
 
 {% if pasien %}
-<p class="muted small">Nilai ditampilkan sebagai <b>Awal → Akhir</b> bila pengukuran
-  akhir sudah ada. Satu baris = satu pasien.</p>
+<p class="muted small">Skor yang ditampilkan = <b>pengukuran awal</b>. Satu baris =
+  satu pasien; kolom <b>Pengukuran</b> menunjukkan jumlah kunjungan.</p>
 <div class="table-wrap">
   <table class="table table-admin">
     <thead>
       <tr>
         <th>#</th>
         <th>Tgl Awal</th>
-        <th>Nama</th>
+        <th class="col-nama">Nama</th>
         <th>No. RM</th>
         <th>Usia</th>
         <th>JK</th>
@@ -27,42 +27,35 @@
         <th class="num">Cemas</th>
         <th class="num">Stres</th>
         <th class="num">MoCA</th>
-        <th>Akhir</th>
+        <th class="num">Pengukuran</th>
         <th></th>
       </tr>
     </thead>
     <tbody>
       {% for p in pasien %}
-      {% set ada_akhir = p['akhir_id'] is not none %}
+      {% set total_ukur = 1 + (p['n_lanjutan'] or 0) %}
       <tr>
         <td>{{ p['id'] }}</td>
         <td>{{ p['tanggal'] or '-' }}</td>
-        <td>{{ p['nama'] or '-' }}</td>
+        <td class="col-nama">{{ p['nama'] or '-' }}</td>
         <td>{{ p['no_rm'] or '-' }}</td>
         <td>{{ p['usia'] or '-' }}</td>
         <td>{{ (p['jenis_kelamin'] or '')[:1] }}</td>
-        <td class="num">{{ p['psqi_global'] }}{% if ada_akhir %} <span class="arrow">→</span> {{ p['akhir_psqi_global'] }}{% endif %}</td>
-        <td class="num">{{ p['dass_depresi'] }}{% if ada_akhir %} <span class="arrow">→</span> {{ p['akhir_dass_depresi'] }}{% endif %}</td>
-        <td class="num">{{ p['dass_cemas'] }}{% if ada_akhir %} <span class="arrow">→</span> {{ p['akhir_dass_cemas'] }}{% endif %}</td>
-        <td class="num">{{ p['dass_stres'] }}{% if ada_akhir %} <span class="arrow">→</span> {{ p['akhir_dass_stres'] }}{% endif %}</td>
+        <td class="num">{{ p['psqi_global'] }}</td>
+        <td class="num">{{ p['dass_depresi'] }} <small>{{ p['dass_depresi_kat'] }}</small></td>
+        <td class="num">{{ p['dass_cemas'] }} <small>{{ p['dass_cemas_kat'] }}</small></td>
+        <td class="num">{{ p['dass_stres'] }} <small>{{ p['dass_stres_kat'] }}</small></td>
+        <td class="num">{{ p['moca_total'] if p['moca_total'] is not none else '–' }}</td>
         <td class="num">
-          {{ p['moca_total'] if p['moca_total'] is not none else '–' }}
-          {% if ada_akhir %} <span class="arrow">→</span> {{ p['akhir_moca_total'] if p['akhir_moca_total'] is not none else '–' }}{% endif %}
-        </td>
-        <td>
-          {% if ada_akhir %}
-            <span class="tag tag-good">Selesai</span>
+          {% if total_ukur > 1 %}
+            <a class="tag tag-good" href="{{ url_for('admin_banding', pasien_id=p['id']) }}">{{ total_ukur }}×</a>
           {% else %}
-            <span class="tag tag-pending">Belum</span>
+            <span class="tag tag-pending">1×</span>
           {% endif %}
         </td>
         <td class="actions-cell">
           <a class="link" href="{{ url_for('admin_detail', resp_id=p['id']) }}">Detail</a>
-          {% if ada_akhir %}
-            <a class="link" href="{{ url_for('admin_banding', pasien_id=p['id']) }}">Banding</a>
-          {% else %}
-            <a class="link link-add" href="{{ url_for('admin_akhir', pasien_id=p['id']) }}">+ Akhir</a>
-          {% endif %}
+          <a class="link link-add" href="{{ url_for('admin_akhir', pasien_id=p['id']) }}">+ Ukur</a>
         </td>
       </tr>
       {% endfor %}

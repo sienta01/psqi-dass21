@@ -21,5 +21,10 @@ os.environ.setdefault("SECRET_KEY", "GANTI-DENGAN-STRING-ACAK-PANJANG")
 os.environ.setdefault("ADMIN_PASSWORD", "GANTI-PASSWORD-ADMIN-ANDA")
 # os.environ.setdefault("APP_TITLE", "Penelitian Tidur Pasien Stroke")
 
+# Pengingat Telegram (lihat README bagian "Pengingat Kontrol via Telegram").
+# Catatan: scheduled task TIDAK membaca file ini; set juga di perintah task.
+# os.environ.setdefault("TELEGRAM_BOT_TOKEN", "123456789:ABCdef...")
+# os.environ.setdefault("TELEGRAM_CHAT_ID", "123456789")
+
 # 3) Impor objek Flask `app` sebagai `application` (WAJIB bernama application).
 from app import app as application  # noqa: E402

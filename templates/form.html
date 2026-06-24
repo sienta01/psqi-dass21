@@ -39,10 +39,10 @@
   </div>
 {% elif fase == 'akhir' %}
   <div class="edit-banner akhir-banner">
-    <span>📋 <strong>Pengukuran Akhir</strong> untuk pasien
-      <strong>{{ akhir_nama or '—' }}</strong>. Data karakteristik disalin dari
-      pengukuran awal — periksa &amp; perbarui bila perlu, lalu isi PSQI, DASS-21,
-      dan MoCA-Ina.</span>
+    <span>📋 <strong>Pengukuran Lanjutan{% if akhir_ke %} ke-{{ akhir_ke }}{% endif %}</strong>
+      untuk pasien <strong>{{ akhir_nama or '—' }}</strong>. Data karakteristik
+      disalin dari pengukuran awal — periksa &amp; perbarui bila perlu, lalu isi
+      PSQI, DASS-21, dan MoCA-Ina.</span>
     <a class="link" href="{{ url_for('admin_detail', resp_id=akhir_pasien_id) }}">Batal</a>
   </div>
 {% endif %}
@@ -56,7 +56,7 @@
   {% if can_search %}
     <div class="edit-banner akhir-banner" id="akhir-pilih-banner"
          {% if not values.get('parent_id') %}hidden{% endif %}>
-      <span>📋 <strong>Pengukuran Akhir</strong> untuk pasien
+      <span>📋 <strong>Pengukuran Lanjutan</strong> untuk pasien
         <strong id="akhir-pilih-nama">{{ values.get('nama', '') }}</strong>.
         Data karakteristik disalin dari pengukuran awal — periksa lalu isi PSQI,
         DASS-21, dan MoCA-Ina.</span>
@@ -96,8 +96,8 @@
                    placeholder="Ketik nama… (pilih dari daftar untuk pengukuran akhir)">
             <div class="ac-list" id="nama-ac-list" role="listbox" hidden></div>
           </div>
-          <p class="hint">Pilih pasien yang muncul untuk mengisi
-            <b>pengukuran akhir</b>, atau ketik nama baru untuk pasien baru.</p>
+          <p class="hint">Pilih pasien yang muncul untuk menambah
+            <b>pengukuran lanjutan</b>, atau ketik nama baru untuk pasien baru.</p>
 
         {% elif f.type in ['text', 'date', 'number', 'tel'] %}
           <input class="input" type="{{ f.type }}" id="{{ f.name }}"
@@ -105,6 +105,14 @@
                  {% if f.required %}data-required="1"{% endif %}
                  {% if f.min is defined %}min="{{ f.min }}"{% endif %}
                  {% if f.max is defined %}max="{{ f.max }}"{% endif %}>
+          {% if f.hint %}<p class="hint">{{ f.hint }}</p>{% endif %}
+
+        {% elif f.type == 'checkbox' %}
+          <label class="opt opt-check">
+            <input type="checkbox" id="{{ f.name }}" name="{{ f.name }}" value="1"
+                   {% if values.get(f.name) in ['1', 'on', 'true', 'Ya'] %}checked{% endif %}>
+            <span>{{ f.checkbox_text or f.label }}</span>
+          </label>
 
         {% elif f.type == 'radio' %}
           {{ radio_list(f.name, f.options, f.required) }}
