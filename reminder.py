@@ -76,24 +76,43 @@ def pesan_pengingat(row, tgl_kontrol) -> str:
     ).format(nama=nama, norm=norm, tgl=tgl_kontrol)
 
 
-def jalankan(target_tanggal: str, dry_run: bool = False) -> int:
+def proses_kirim(target_tanggal: str) -> dict:
+    """Kirim pengingat (sungguhan) untuk kontrol pada `target_tanggal`.
+
+    Dipakai oleh endpoint web maupun CLI. Mengembalikan
+    {'due': jumlah pasien jatuh tempo, 'terkirim': jumlah berhasil terkirim}.
+    Bila due == 0, tidak ada pesan dikirim (hari kosong = senyap).
+    """
     db.init_db()
     rows = db.pasien_kontrol_pada(target_tanggal)
-    if not rows:
-        print("Tidak ada pasien dengan kontrol pada", target_tanggal)
-        return 0
     terkirim = 0
     for row in rows:
-        teks = pesan_pengingat(row, target_tanggal)
-        if dry_run:
+        if kirim_telegram(pesan_pengingat(row, target_tanggal)):
+            terkirim += 1
+    return {"due": len(rows), "terkirim": terkirim}
+
+
+def jalankan(target_tanggal: str, dry_run: bool = False) -> int:
+    """Versi CLI: cetak ringkasan, kembalikan jumlah (akan) terkirim."""
+    if dry_run:
+        db.init_db()
+        rows = db.pasien_kontrol_pada(target_tanggal)
+        if not rows:
+            print("Tidak ada pasien dengan kontrol pada", target_tanggal)
+            return 0
+        for row in rows:
             print("--- (dry-run) ---")
-            print(teks)
-            terkirim += 1
-        elif kirim_telegram(teks):
-            print("Terkirim: %s (No. RM %s)" % (row["nama"], row["no_rm"]))
-            terkirim += 1
-    print("Selesai. %d pengingat untuk kontrol %s." % (terkirim, target_tanggal))
-    return terkirim
+            print(pesan_pengingat(row, target_tanggal))
+        print("Selesai (dry-run). %d pengingat untuk kontrol %s."
+              % (len(rows), target_tanggal))
+        return len(rows)
+
+    hasil = proses_kirim(target_tanggal)
+    if hasil["due"] == 0:
+        print("Tidak ada pasien dengan kontrol pada", target_tanggal)
+    print("Selesai. %d/%d pengingat untuk kontrol %s."
+          % (hasil["terkirim"], hasil["due"], target_tanggal))
+    return hasil["terkirim"]
 
 
 def main(argv):

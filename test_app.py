@@ -8,6 +8,7 @@ import tempfile
 # Pakai DB sementara agar tidak mengotori data.db
 os.environ["DATABASE_PATH"] = os.path.join(tempfile.gettempdir(), "test_psqi.db")
 os.environ["ADMIN_PASSWORD"] = "rahasia123"
+os.environ["CRON_KEY"] = "cronsecret"
 if os.path.exists(os.environ["DATABASE_PATH"]):
     os.remove(os.environ["DATABASE_PATH"])
 
@@ -284,6 +285,25 @@ def main():
     csv_text = client.get("/admin/export.csv").data.decode("utf-8")
     assert "cogstim" in csv_text.lower() and "Kontrol" in csv_text
     print("OK  ekspor punya kolom cogstim & tanggal kontrol")
+
+    # 15) Endpoint pemicu pengingat (untuk cron-job.org)
+    reminder.kirim_telegram = lambda teks: True   # jangan benar-benar kirim
+    assert client.get("/cron/kirim-pengingat").status_code == 403
+    assert client.get("/cron/kirim-pengingat?key=salah").status_code == 403
+    print("OK  /cron tanpa key / key salah -> 403")
+
+    r = client.get("/cron/kirim-pengingat?key=cronsecret")
+    js = r.get_json()
+    assert r.status_code == 200 and js["ok"] and js["terkirim"] >= 1, js
+    print("OK  /cron key benar -> terkirim %d" % js["terkirim"])
+
+    js2 = client.get("/cron/kirim-pengingat?key=cronsecret").get_json()
+    assert js2.get("skipped") is True, js2
+    print("OK  /cron panggilan kedua hari sama -> skipped (idempoten)")
+
+    r = client.get("/cron/kirim-pengingat?key=cronsecret&force=1")
+    assert r.status_code == 200 and r.get_json()["terkirim"] >= 1
+    print("OK  /cron ?force=1 -> kirim ulang")
 
     print("\nSemua smoke test lulus.")
 

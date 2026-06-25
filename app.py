@@ -4,6 +4,7 @@ Dirancang untuk di-hosting di PythonAnywhere (lihat README.md).
 Created on 22/06/2026 by Timothy Subroto
 """
 import secrets
+from datetime import timedelta
 from functools import wraps
 
 import waktu
@@ -435,6 +436,40 @@ def admin_export():
                 f"attachment; filename=data_psqi_dass21_{today}.csv"
         },
     )
+
+
+# ---------------------------------------------------------------------------
+# Pemicu pengingat (untuk penjadwal eksternal, mis. cron-job.org)
+# ---------------------------------------------------------------------------
+@app.route("/cron/kirim-pengingat")
+def cron_kirim_pengingat():
+    """Jalankan pengingat H-1 saat dipanggil penjadwal eksternal.
+
+    Diamankan dengan ?key=CRON_KEY. Idempoten per hari (penanda di DB);
+    ?force=1 melewati penanda. Lihat README ("cron-job.org")."""
+    expected = app.config.get("CRON_KEY", "")
+    key = request.args.get("key", "")
+    if not expected or not secrets.compare_digest(key, expected):
+        abort(403)
+
+    import reminder
+    today = waktu.hari_ini().isoformat()
+    besok = (waktu.hari_ini() + timedelta(days=1)).isoformat()
+    force = request.args.get("force") == "1"
+
+    if not force and db.meta_get("last_reminder_date") == today:
+        return jsonify({"ok": True, "skipped": True,
+                        "alasan": "sudah dijalankan hari ini", "tanggal": today})
+
+    hasil = reminder.proses_kirim(besok)
+    sukses = hasil["due"] == 0 or hasil["terkirim"] == hasil["due"]
+    if sukses:
+        db.meta_set("last_reminder_date", today)
+        return jsonify({"ok": True, "tanggal_kontrol": besok,
+                        "due": hasil["due"], "terkirim": hasil["terkirim"]})
+    return jsonify({"ok": False, "tanggal_kontrol": besok,
+                    "due": hasil["due"], "terkirim": hasil["terkirim"],
+                    "error": "sebagian pengingat gagal terkirim"}), 500
 
 
 # ---------------------------------------------------------------------------

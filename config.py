@@ -54,3 +54,7 @@ class Config:
     # Pengingat Telegram (lihat reminder.py & README).
     TELEGRAM_BOT_TOKEN = _get("TELEGRAM_BOT_TOKEN", "")
     TELEGRAM_CHAT_ID = _get("TELEGRAM_CHAT_ID", "")
+
+    # Kunci rahasia untuk endpoint pemicu pengingat (/cron/kirim-pengingat).
+    # Dipakai oleh penjadwal eksternal (mis. cron-job.org). Isi string acak panjang.
+    CRON_KEY = _get("CRON_KEY", "")

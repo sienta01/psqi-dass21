@@ -35,6 +35,10 @@ CREATE TABLE IF NOT EXISTS responses (
     data_json       TEXT NOT NULL,
     skor_json       TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS app_meta (
+    key   TEXT PRIMARY KEY,
+    value TEXT
+);
 """
 
 # Kolom yang mungkin perlu ditambahkan ke database lama (migrasi ringan).
@@ -166,6 +170,26 @@ def hapus_satu(resp_id: int):
 def hitung_total() -> int:
     with get_conn() as conn:
         return conn.execute("SELECT COUNT(*) AS n FROM responses").fetchone()["n"]
+
+
+# ---------------------------------------------------------------------------
+# Metadata aplikasi (key-value), mis. penanda terakhir pengingat dijalankan
+# ---------------------------------------------------------------------------
+def meta_get(key: str):
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT value FROM app_meta WHERE key = ?", (key,)
+        ).fetchone()
+    return row["value"] if row else None
+
+
+def meta_set(key: str, value: str):
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO app_meta (key, value) VALUES (?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (key, value),
+        )
 
 
 # ---------------------------------------------------------------------------

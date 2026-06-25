@@ -228,21 +228,40 @@ python reminder.py --test      # kirim 1 pesan uji ke Telegram Anda
 python reminder.py --dry-run   # tampilkan pengingat besok tanpa mengirim
 ```
 
-### 4. Jadwalkan harian di PythonAnywhere
-1. Buka tab **Tasks** (Scheduled tasks).
-2. Tambah task harian (pilih jamnya) dengan perintah:
-   ```bash
-   python3 /home/USERNAME/psqi-dass21/reminder.py
-   ```
-   Ganti `USERNAME`/path bila perlu. Bila Anda sudah membuat `secrets.json`,
-   token otomatis terbaca — tidak perlu menempel token di perintah. (Bila tidak
-   memakai `secrets.json`, tempel token di depan perintah:
-   `TELEGRAM_BOT_TOKEN='...' TELEGRAM_CHAT_ID='...' python3 .../reminder.py`.)
-3. Task berjalan tiap hari & mengirim pengingat untuk kontrol esok hari.
+### 4. Jadwalkan harian — GRATIS, tanpa Scheduled Task (cron-job.org)
+Scheduled Task PythonAnywhere **berbayar**. Untuk akun **gratis**, aplikasi
+menyediakan endpoint yang dipanggil sekali sehari oleh penjadwal eksternal
+gratis. Caranya:
 
-> Jam task di PythonAnywhere memakai **UTC**. Untuk kirim jam 08:00 WITA (UTC+8),
-> jadwalkan task pada **00:00 UTC**. Akun gratis memberi **satu** task harian —
-> cukup untuk pengingat ini.
+1. Tambahkan **`CRON_KEY`** (string acak panjang, bebas) ke `secrets.json`:
+   ```json
+   { "...": "...", "CRON_KEY": "kunci-acak-panjang-anda" }
+   ```
+   Lalu klik **Reload** di tab Web PythonAnywhere.
+2. URL endpoint Anda:
+   ```
+   https://USERNAME.pythonanywhere.com/cron/kirim-pengingat?key=KUNCI-ANDA
+   ```
+   Buka di browser untuk menguji — harus muncul JSON. Tambah `&force=1` untuk
+   menguji ulang di hari yang sama (mengabaikan penanda "sudah jalan").
+3. Daftar gratis di **<https://cron-job.org>** → **Create cronjob**:
+   - **URL**: tempel URL endpoint di atas.
+   - **Schedule**: setiap hari, pilih jam (mis. 08:00) dan **timezone
+     Asia/Makassar (WITA)**.
+   - Simpan, lalu aktifkan notifikasi bila job gagal.
+
+Endpoint ini **aman** (butuh `CRON_KEY`), **idempoten** (tak mengirim ganda
+walau dipanggil beberapa kali sehari), dan **senyap** pada hari tanpa pasien
+jatuh tempo (tidak ada pesan). Riwayat eksekusi terlihat di dasbor cron-job.org.
+
+> **Pemicu lain (opsional, endpoint sama):**
+> - **UptimeRobot** — monitor URL tiap 5 menit; idempotensi mencegah kirim ganda.
+> - **GitHub Actions** — workflow `schedule` (cron UTC) memanggil URL via `curl`.
+> - **PC Anda** — Windows Task Scheduler memanggil URL via PowerShell
+>   `Invoke-RestMethod` (hanya jalan saat PC menyala).
+> - **PythonAnywhere berbayar** — tab **Tasks**, jadwalkan
+>   `python3 /home/USERNAME/psqi-dass21/reminder.py` (jam **UTC**; 00:00 UTC =
+>   08:00 WITA). `secrets.json` membuat token terbaca otomatis.
 
 ---
 

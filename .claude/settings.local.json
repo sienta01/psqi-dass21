@@ -9,7 +9,10 @@
       "Bash(python test_scoring.py)",
       "Bash(python -c \"import app\")",
       "mcp__Claude_Preview__preview_start",
-      "Bash(python test_app.py)"
+      "Bash(python test_app.py)",
+      "Bash(python -c \"import app, reminder; print\\('imports OK'\\)\")",
+      "Bash(rm -f data.db)",
+      "Bash(rm -rf __pycache__)"
     ]
   }
 }
