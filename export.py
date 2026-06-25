@@ -8,7 +8,7 @@ import io
 import json
 
 import questions as Q
-from scoring import PSQI_KOMPONEN_LABEL
+from scoring import PSQI_KOMPONEN_LABEL, psqi_dinilai, dass_dinilai
 
 
 def _build_spec():
@@ -96,6 +96,11 @@ SPEC = _build_spec()
 def _record_to_dict(row):
     data = json.loads(row["data_json"])
     skor = json.loads(row["skor_json"])
+    # Kosongkan skor terhitung bila kuesioner tidak diisi (hindari angka 0 palsu).
+    if not psqi_dinilai(data):
+        skor["psqi"] = {}
+    if not dass_dinilai(data):
+        skor["dass21"] = {}
     skor["_id"] = row["id"]
     skor["_created_at"] = row["created_at"]
     keys = row.keys()

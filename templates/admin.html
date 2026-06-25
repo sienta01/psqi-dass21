@@ -28,6 +28,7 @@
         <th class="num">Cemas</th>
         <th class="num">Stres</th>
         <th class="num">MoCA</th>
+        <th>Kontrol</th>
         <th class="num">Pengukuran</th>
         <th></th>
       </tr>
@@ -49,11 +50,16 @@
             <span class="tag tag-pending">–</span>
           {% endif %}
         </td>
-        <td class="num">{{ p['psqi_global'] }}</td>
-        <td class="num">{{ p['dass_depresi'] }} <small>{{ p['dass_depresi_kat'] }}</small></td>
-        <td class="num">{{ p['dass_cemas'] }} <small>{{ p['dass_cemas_kat'] }}</small></td>
-        <td class="num">{{ p['dass_stres'] }} <small>{{ p['dass_stres_kat'] }}</small></td>
+        <td class="num">{{ p['psqi_global'] if p['psqi_dinilai'] else '–' }}</td>
+        {% if p['dass_dinilai'] %}
+          <td class="num">{{ p['dass_depresi'] }} <small>{{ p['dass_depresi_kat'] }}</small></td>
+          <td class="num">{{ p['dass_cemas'] }} <small>{{ p['dass_cemas_kat'] }}</small></td>
+          <td class="num">{{ p['dass_stres'] }} <small>{{ p['dass_stres_kat'] }}</small></td>
+        {% else %}
+          <td class="num">–</td><td class="num">–</td><td class="num">–</td>
+        {% endif %}
         <td class="num">{{ p['moca_total'] if p['moca_total'] is not none else '–' }}</td>
+        <td>{{ p['kontrol_terbaru'] or '–' }}</td>
         <td class="num">
           {% if total_ukur > 1 %}
             <a class="tag tag-good" href="{{ url_for('admin_banding', pasien_id=p['id']) }}">{{ total_ukur }}×</a>

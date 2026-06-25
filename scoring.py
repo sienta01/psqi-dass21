@@ -147,6 +147,25 @@ def _komp7_disfungsi(q7, q8):
     return 3
 
 
+# Field PSQI yang dicek untuk menentukan apakah kuesioner diisi.
+_PSQI_FIELD_CEK = (
+    ["psqi_q1_bedtime", "psqi_q2_latency_min", "psqi_q3_waketime",
+     "psqi_q4_sleep_hours"]
+    + ["psqi_q5" + h for h in "abcdefghij"]
+    + ["psqi_q6", "psqi_q7", "psqi_q8", "psqi_q9"]
+)
+
+
+def psqi_dinilai(ans: dict) -> bool:
+    """True bila minimal satu field PSQI diisi."""
+    return any(_is_filled(ans.get(f)) for f in _PSQI_FIELD_CEK)
+
+
+def dass_dinilai(ans: dict) -> bool:
+    """True bila minimal satu item DASS-21 diisi."""
+    return any(_is_filled(ans.get("dass_q" + str(i))) for i in range(1, 22))
+
+
 def hitung_psqi(ans: dict) -> dict:
     """Hitung skor PSQI dari dict jawaban (key berawalan 'psqi_').
 
@@ -192,6 +211,7 @@ def hitung_psqi(ans: dict) -> dict:
             else "Kualitas tidur baik"
         ),
         "buruk": buruk,
+        "dinilai": psqi_dinilai(ans),
     }
 
 
@@ -239,7 +259,7 @@ def _dass_kategori(subskala, skor):
 
 def hitung_dass21(ans: dict) -> dict:
     """Hitung skor DASS-21 dari dict jawaban (key 'dass_q1'..'dass_q21')."""
-    hasil = {}
+    hasil = {"dinilai": dass_dinilai(ans)}
     for subskala, items in DASS_SUBSKALA.items():
         mentah = sum(_to_int(ans.get(f"dass_q{i}")) for i in items)
         skor = mentah * 2
@@ -376,7 +396,8 @@ def bandingkan(awal: dict, akhir: dict) -> dict:
     hasil = {}
 
     pa, pk = awal.get("psqi", {}), akhir.get("psqi", {})
-    d = _delta(pa.get("skor_global"), pk.get("skor_global"))
+    psqi_ok = pa.get("dinilai", True) and pk.get("dinilai", True)
+    d = _delta(pa.get("skor_global"), pk.get("skor_global")) if psqi_ok else None
     hasil["psqi"] = {
         "awal": pa.get("skor_global"), "akhir": pk.get("skor_global"),
         "delta": d, "arah": _arah(d, True),
@@ -385,10 +406,12 @@ def bandingkan(awal: dict, akhir: dict) -> dict:
     }
 
     hasil["dass"] = {}
+    dass_ok = (awal.get("dass21", {}).get("dinilai", True)
+               and akhir.get("dass21", {}).get("dinilai", True))
     for sub in ("depresi", "cemas", "stres"):
         da = awal.get("dass21", {}).get(sub, {})
         dk = akhir.get("dass21", {}).get(sub, {})
-        d = _delta(da.get("skor"), dk.get("skor"))
+        d = _delta(da.get("skor"), dk.get("skor")) if dass_ok else None
         hasil["dass"][sub] = {
             "awal": da.get("skor"), "akhir": dk.get("skor"),
             "awal_kat": da.get("kategori"), "akhir_kat": dk.get("kategori"),

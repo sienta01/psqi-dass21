@@ -18,8 +18,8 @@ import export
 import questions as Q
 from config import Config
 from scoring import (
-    hitung_semua, bandingkan, PSQI_KOMPONEN_LABEL, DASS_SUBSKALA_LABEL,
-    MOCA_DOMAIN_LABEL,
+    hitung_semua, bandingkan, psqi_dinilai, dass_dinilai,
+    PSQI_KOMPONEN_LABEL, DASS_SUBSKALA_LABEL, MOCA_DOMAIN_LABEL,
 )
 
 app = Flask(__name__)
@@ -85,6 +85,14 @@ def _row_fase(row):
         return row["fase"] or "awal"
     except (KeyError, IndexError):
         return "awal"
+
+
+def _lengkapi_dinilai(data, skor):
+    """Pastikan flag `dinilai` PSQI & DASS ada pada skor tersimpan (record lama
+    belum punya). Dihitung dari jawaban mentah agar akurat untuk data lama."""
+    skor.setdefault("psqi", {}).setdefault("dinilai", psqi_dinilai(data))
+    skor.setdefault("dass21", {}).setdefault("dinilai", dass_dinilai(data))
+    return skor
 
 
 # ---------------------------------------------------------------------------
@@ -220,7 +228,7 @@ def hasil(resp_id):
         abort(404)
     import json
     data = json.loads(row["data_json"])
-    skor = json.loads(row["skor_json"])
+    skor = _lengkapi_dinilai(data, json.loads(row["skor_json"]))
     fase = _row_fase(row)
     return render_template(
         "hasil.html", data=data, skor=skor, resp_id=resp_id,
@@ -263,10 +271,12 @@ def admin():
     for r in db.ambil_pasien_list():
         d = dict(r)
         try:
-            cog = json.loads(r["data_json"]).get("cogstim_explained")
+            ans = json.loads(r["data_json"])
         except (ValueError, TypeError):
-            cog = None
-        d["cogstim"] = cog in ("1", "on", "true", "Ya")
+            ans = {}
+        d["cogstim"] = ans.get("cogstim_explained") in ("1", "on", "true", "Ya")
+        d["psqi_dinilai"] = psqi_dinilai(ans)
+        d["dass_dinilai"] = dass_dinilai(ans)
         pasien.append(d)
     return render_template("admin.html", pasien=pasien, total=len(pasien))
 
@@ -279,7 +289,7 @@ def admin_detail(resp_id):
         abort(404)
     import json
     data = json.loads(row["data_json"])
-    skor = json.loads(row["skor_json"])
+    skor = _lengkapi_dinilai(data, json.loads(row["skor_json"]))
     fase = _row_fase(row)
 
     # Konteks longitudinal: id pasien (pengukuran awal) & jumlah pengukuran.
@@ -385,9 +395,11 @@ def admin_banding(pasien_id):
     data = json.loads(awal["data_json"])
     pengukuran = []
     for i, r in enumerate(rows, 1):
+        rdata = json.loads(r["data_json"])
         pengukuran.append({
             "no": i, "id": r["id"], "tanggal": r["tanggal"],
-            "fase": _row_fase(r), "skor": json.loads(r["skor_json"]),
+            "fase": _row_fase(r),
+            "skor": _lengkapi_dinilai(rdata, json.loads(r["skor_json"])),
         })
     # Selisih pengukuran pertama vs terakhir.
     perbandingan = bandingkan(pengukuran[0]["skor"], pengukuran[-1]["skor"])

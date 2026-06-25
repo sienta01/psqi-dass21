@@ -20,6 +20,7 @@
 {# ---------------- PSQI ---------------- #}
 <section class="result-card">
   <h2>PSQI — Kualitas Tidur</h2>
+  {% if skor.psqi.dinilai %}
   <div class="score-banner {{ 'bad' if skor.psqi.buruk else 'good' }}">
     <div class="score-big">{{ skor.psqi.skor_global }}<span>/21</span></div>
     <div class="score-text">
@@ -51,11 +52,15 @@
       Lama di tempat tidur: {{ skor.psqi.jam_di_tempat_tidur }} jam
     {% endif %}
   </p>
+  {% else %}
+    <p class="muted">PSQI tidak diisi untuk pengukuran ini.</p>
+  {% endif %}
 </section>
 
 {# ---------------- DASS-21 ---------------- #}
 <section class="result-card">
   <h2>DASS-21 — Depresi, Cemas, Stres</h2>
+  {% if skor.dass21.dinilai %}
   <div class="dass-cards">
     {% for sub, label in dass_label.items() %}
       {% set d = skor.dass21[sub] %}
@@ -81,6 +86,9 @@
       </tbody>
     </table>
   </details>
+  {% else %}
+    <p class="muted">DASS-21 tidak diisi untuk pengukuran ini.</p>
+  {% endif %}
 </section>
 
 {# ---------------- MoCA-Ina ---------------- #}

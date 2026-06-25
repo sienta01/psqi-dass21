@@ -4,8 +4,19 @@ Jalankan: python test_scoring.py
 """
 from scoring import (
     hitung_psqi, hitung_dass21, hitung_moca, hitung_semua, bandingkan,
-    jam_di_tempat_tidur,
+    psqi_dinilai, dass_dinilai, jam_di_tempat_tidur,
 )
+
+
+def test_dinilai_flags():
+    assert psqi_dinilai({}) is False
+    assert dass_dinilai({}) is False
+    assert psqi_dinilai({"psqi_q9": "2"}) is True
+    assert dass_dinilai({"dass_q1": "0"}) is True   # "0" tetap dianggap diisi
+    # Skor tetap dihitung, tapi flag dinilai=False bila kosong
+    assert hitung_psqi({})["dinilai"] is False
+    assert hitung_dass21({})["dinilai"] is False
+    print("OK  psqi_dinilai / dass_dinilai")
 
 
 def test_jam_di_tempat_tidur():
@@ -196,4 +207,5 @@ if __name__ == "__main__":
     test_moca_clamp()
     test_bandingkan()
     test_bandingkan_moca_tidak_lengkap()
+    test_dinilai_flags()
     print("\nSemua tes lulus.")

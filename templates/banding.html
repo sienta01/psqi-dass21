@@ -38,15 +38,15 @@
       <tbody>
         <tr>
           <td>PSQI Global (0–21)</td>
-          {% for m in pengukuran %}<td class="num">{{ m.skor.psqi.skor_global }}</td>{% endfor %}
+          {% for m in pengukuran %}<td class="num">{% if m.skor.psqi.dinilai %}{{ m.skor.psqi.skor_global }}{% else %}–{% endif %}</td>{% endfor %}
           <td class="num">{{ delta(perbandingan.psqi) }}</td>
         </tr>
         {% for sub, label in dass_label.items() %}
           <tr>
             <td>DASS {{ label }}</td>
             {% for m in pengukuran %}
-              <td class="num">{{ m.skor.dass21[sub].skor }}
-                <small>{{ m.skor.dass21[sub].kategori }}</small></td>
+              <td class="num">{% if m.skor.dass21.dinilai %}{{ m.skor.dass21[sub].skor }}
+                <small>{{ m.skor.dass21[sub].kategori }}</small>{% else %}–{% endif %}</td>
             {% endfor %}
             <td class="num">{{ delta(perbandingan.dass[sub]) }}</td>
           </tr>

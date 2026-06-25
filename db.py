@@ -172,12 +172,16 @@ def hitung_total() -> int:
 # Query untuk desain longitudinal (pengukuran awal & akhir)
 # ---------------------------------------------------------------------------
 def ambil_pasien_list():
-    """Satu baris per pasien (pengukuran awal) + jumlah pengukuran lanjutan."""
+    """Satu baris per pasien (pengukuran awal) + jumlah pengukuran lanjutan +
+    tanggal kontrol dari pengukuran TERBARU."""
     with get_conn() as conn:
         return conn.execute(
             """SELECT a.*,
                       (SELECT COUNT(*) FROM responses b
-                       WHERE b.parent_id = a.id) AS n_lanjutan
+                       WHERE b.parent_id = a.id) AS n_lanjutan,
+                      (SELECT c.kontrol_berikutnya FROM responses c
+                       WHERE (c.id = a.id OR c.parent_id = a.id)
+                       ORDER BY c.created_at DESC LIMIT 1) AS kontrol_terbaru
                FROM responses a
                WHERE a.fase = 'awal'
                ORDER BY a.id DESC""",

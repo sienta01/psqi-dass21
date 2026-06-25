@@ -147,10 +147,11 @@ def main():
     r = client.post("/isi", data={
         "_csrf": token, "tanggal": "2026-06-23", "nama": "Minimal Saja"})
     assert r.status_code == 302 and "/hasil/" in r.headers["Location"], r.status_code
-    # Field opsional yang kosong dianggap 0 -> PSQI baik, DASS Normal
-    r = client.get(r.headers["Location"])
-    assert b"Kualitas tidur baik" in r.data and b"Normal" in r.data
-    print("OK  POST /isi minimal (hanya tanggal+nama) diterima")
+    # Bagian yang kosong ditandai "tidak diisi", bukan skor 0 palsu.
+    body = client.get(r.headers["Location"]).data
+    assert b"PSQI tidak diisi" in body and b"DASS-21 tidak diisi" in body
+    assert b"tidak dinilai" in body  # MoCA
+    print("OK  POST /isi minimal -> bagian kosong ditandai 'tidak diisi'")
 
     # 12) Alur longitudinal: pengukuran awal -> akhir -> perbandingan
     with client.session_transaction() as s:
