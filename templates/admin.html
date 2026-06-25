@@ -22,6 +22,7 @@
         <th>No. RM</th>
         <th>Usia</th>
         <th>JK</th>
+        <th>Cogstim</th>
         <th class="num">PSQI</th>
         <th class="num">Depresi</th>
         <th class="num">Cemas</th>
@@ -41,6 +42,13 @@
         <td>{{ p['no_rm'] or '-' }}</td>
         <td>{{ p['usia'] or '-' }}</td>
         <td>{{ (p['jenis_kelamin'] or '')[:1] }}</td>
+        <td>
+          {% if p['cogstim'] %}
+            <span class="tag tag-good">✓</span>
+          {% else %}
+            <span class="tag tag-pending">–</span>
+          {% endif %}
+        </td>
         <td class="num">{{ p['psqi_global'] }}</td>
         <td class="num">{{ p['dass_depresi'] }} <small>{{ p['dass_depresi_kat'] }}</small></td>
         <td class="num">{{ p['dass_cemas'] }} <small>{{ p['dass_cemas_kat'] }}</small></td>

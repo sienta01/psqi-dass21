@@ -258,7 +258,16 @@ def admin_logout():
 @app.route("/admin")
 @login_required
 def admin():
-    pasien = db.ambil_pasien_list()
+    import json
+    pasien = []
+    for r in db.ambil_pasien_list():
+        d = dict(r)
+        try:
+            cog = json.loads(r["data_json"]).get("cogstim_explained")
+        except (ValueError, TypeError):
+            cog = None
+        d["cogstim"] = cog in ("1", "on", "true", "Ya")
+        pasien.append(d)
     return render_template("admin.html", pasien=pasien, total=len(pasien))
 
 
