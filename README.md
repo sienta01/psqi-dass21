@@ -204,33 +204,45 @@ Berikutnya = besok** (pengingat H-1). Pesan berisi **Nama**, **No. RM**, dan
    (ganti `<TOKEN>`). Cari `"chat":{"id":<angka>...}` — angka itu **chat ID** Anda.
    (Alternatif: kirim pesan ke **@userinfobot** untuk melihat ID Anda.)
 
-### 3. Set environment variable
-Di file WSGI PythonAnywhere (atau environment), tambahkan:
-```python
-os.environ.setdefault("TELEGRAM_BOT_TOKEN", "123456789:ABCdef...")
-os.environ.setdefault("TELEGRAM_CHAT_ID", "123456789")
+### 3. Simpan token (CARA TERMUDAH: file `secrets.json`)
+Buat file **`secrets.json`** di folder proyek (sejajar `app.py`). File ini
+dibaca **baik oleh website maupun oleh skrip pengingat**, jadi Anda cukup
+mengaturnya **satu kali**:
+```json
+{
+  "TELEGRAM_BOT_TOKEN": "123456789:ABCdef...",
+  "TELEGRAM_CHAT_ID": "123456789"
+}
 ```
-Untuk uji lokal, set dulu lalu jalankan:
+> Contohnya ada di `secrets.json.example` — salin lalu isi. File ini sudah
+> di-`.gitignore` (tidak ikut ter-commit).
+
+> **Penting:** menaruh token HANYA di file WSGI **tidak cukup** untuk pengingat,
+> karena file WSGI hanya dibaca oleh proses website — **bukan** oleh skrip yang
+> dijalankan dari console/scheduled task. `secrets.json` mengatasi ini.
+
+Uji:
 ```bash
-python reminder.py --test      # kirim 1 pesan uji
+cd ~/psqi-dass21
+python reminder.py --test      # kirim 1 pesan uji ke Telegram Anda
 python reminder.py --dry-run   # tampilkan pengingat besok tanpa mengirim
 ```
 
 ### 4. Jadwalkan harian di PythonAnywhere
 1. Buka tab **Tasks** (Scheduled tasks).
-2. Tambah task harian (pilih jamnya, mis. 08:00) dengan perintah:
+2. Tambah task harian (pilih jamnya) dengan perintah:
    ```bash
    python3 /home/USERNAME/psqi-dass21/reminder.py
    ```
-   Ganti `USERNAME` dan path bila perlu. Karena env var dari file WSGI tidak
-   terbaca oleh scheduled task, **set token & chat ID langsung di perintah**:
-   ```bash
-   TELEGRAM_BOT_TOKEN='123...:ABC...' TELEGRAM_CHAT_ID='123456789' python3 /home/USERNAME/psqi-dass21/reminder.py
-   ```
-3. Task akan berjalan tiap hari dan mengirim pengingat untuk kontrol esok hari.
+   Ganti `USERNAME`/path bila perlu. Bila Anda sudah membuat `secrets.json`,
+   token otomatis terbaca — tidak perlu menempel token di perintah. (Bila tidak
+   memakai `secrets.json`, tempel token di depan perintah:
+   `TELEGRAM_BOT_TOKEN='...' TELEGRAM_CHAT_ID='...' python3 .../reminder.py`.)
+3. Task berjalan tiap hari & mengirim pengingat untuk kontrol esok hari.
 
-> Akun gratis PythonAnywhere memberi **satu** scheduled task harian — cukup untuk
-> pengingat ini.
+> Jam task di PythonAnywhere memakai **UTC**. Untuk kirim jam 08:00 WITA (UTC+8),
+> jadwalkan task pada **00:00 UTC**. Akun gratis memberi **satu** task harian —
+> cukup untuk pengingat ini.
 
 ---
 

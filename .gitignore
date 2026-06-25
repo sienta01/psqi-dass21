@@ -2,6 +2,9 @@
 *.db
 data.db
 
+# Rahasia (token Telegram, password) — JANGAN di-commit
+secrets.json
+
 # Python
 __pycache__/
 *.py[cod]

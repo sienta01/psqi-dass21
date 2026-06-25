@@ -39,7 +39,11 @@ def kirim_telegram(teks: str) -> bool:
     token = Config.TELEGRAM_BOT_TOKEN
     chat_id = Config.TELEGRAM_CHAT_ID
     if not token or not chat_id:
-        print("ERROR: TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID belum diatur.")
+        print("ERROR: TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID belum diatur.\n"
+              "Set lewat environment variable, ATAU buat file secrets.json di "
+              "folder proyek:\n"
+              '  {"TELEGRAM_BOT_TOKEN": "...", "TELEGRAM_CHAT_ID": "..."}\n'
+              "(Catatan: file WSGI TIDAK terbaca saat menjalankan skrip ini.)")
         return False
     url = TELEGRAM_API.format(token=token)
     payload = urllib.parse.urlencode({
